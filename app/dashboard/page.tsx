@@ -18,8 +18,9 @@ async function UserDetails() {
 
 export default function ProtectedPage() {
   return (
-    <div className="flex-1 w-full flex flex-col gap-12">
-      <div className="w-full">
+    // <div className="flex-1 w-full flex flex-col gap-12">
+    <div className="min-h-screen flex flex-col items-center justify-center p-8">
+      {/* <div className="w-full">
         <div className="bg-accent text-sm p-3 px-5 rounded-md text-foreground flex gap-3 items-center">
           <InfoIcon size="16" strokeWidth={2} />
           This is a protected page that you can only see as an authenticated
@@ -37,6 +38,17 @@ export default function ProtectedPage() {
       <div>
         <h2 className="font-bold text-2xl mb-4">Next steps</h2>
         <FetchDataSteps />
+      </div> */}
+      <div className="max-w-4xl w-full">
+        <h1 className="text-4xl font-bold mb-4 text-center">Sales Dashboard</h1>
+        <p className="text-center text-muted-foreground mb-8">
+          This page is under construction. Sales dashboard functionality will be available here.
+        </p>
+        <div className="bg-card border border-border rounded-lg p-8 text-center">
+          <p className="text-muted-foreground">
+            Sales dashboard features coming soon...
+          </p>
+        </div>
       </div>
     </div>
   );

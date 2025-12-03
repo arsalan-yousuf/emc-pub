@@ -20,7 +20,7 @@ export default function Page() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                You&apos;ve successfully signed up. Please check your email to
+                You&apos;ve successfully signed up for EMC Sales App. Please check your email to
                 confirm your account before signing in.
               </p>
             </CardContent>
