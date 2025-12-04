@@ -41,7 +41,7 @@ interface UserProfile {
   name?: string;
   first_name?: string;
   last_name?: string;
-  employee_code?: string;
+  dashboard_id?: number;
 }
 
 export default function LeftNavigation() {
@@ -75,7 +75,7 @@ export default function LeftNavigation() {
         // Fetch profile information
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('first_name, last_name, employee_code')
+          .select('first_name, last_name, dashboard_id')
           .eq('id', authUser.id)
           .single();
 
@@ -90,7 +90,7 @@ export default function LeftNavigation() {
           name: fullName,
           first_name: profile?.first_name,
           last_name: profile?.last_name,
-          employee_code: profile?.employee_code
+          dashboard_id: profile?.dashboard_id
         });
       }
 
@@ -100,7 +100,7 @@ export default function LeftNavigation() {
           // Fetch profile information
           const { data: profile } = await supabase
             .from('profiles')
-            .select('first_name, last_name, employee_code')
+            .select('first_name, last_name, dashboard_id')
             .eq('id', session.user.id)
             .single();
 
@@ -115,7 +115,7 @@ export default function LeftNavigation() {
             name: fullName,
             first_name: profile?.first_name,
             last_name: profile?.last_name,
-            employee_code: profile?.employee_code
+            dashboard_id: profile?.dashboard_id
           });
         } else {
           setUser(null);

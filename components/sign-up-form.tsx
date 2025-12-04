@@ -23,7 +23,7 @@ export function SignUpForm({
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [employeeCode, setEmployeeCode] = useState("");
+  const [dashboardId, setDashboardId] = useState("");
   const [password, setPassword] = useState("");
   const [repeatPassword, setRepeatPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +42,14 @@ export function SignUpForm({
       return;
     }
 
+    // Validate company email domain
+    const allowedDomain = "emc-direct.de";
+    if (!email.toLowerCase().endsWith(`@${allowedDomain}`)) {
+      setError(`Only ${allowedDomain} email addresses are allowed`);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -51,28 +59,14 @@ export function SignUpForm({
           data: {
             first_name: firstName,
             last_name: lastName,
-            employee_code: employeeCode,
+            dashboard_id: dashboardId,
           },
         },
       });
       if (error) throw error;
       
-      // Create profile record if user was created successfully
-      if (data.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: data.user.id,
-            first_name: firstName,
-            last_name: lastName,
-            employee_code: employeeCode,
-          });
-        
-        if (profileError) {
-          console.error('Error creating profile:', profileError);
-          // Don't throw here - user is created, profile can be created later via trigger
-        }
-      }
+      // Profile will be automatically created by the database trigger
+      // No need to manually insert it here to avoid race conditions
       
       router.push("/auth/sign-up-success");
     } catch (error: unknown) {
@@ -116,26 +110,32 @@ export function SignUpForm({
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="employeeCode">Employee Code</Label>
+                  <Label htmlFor="dashboardId">Dashboard ID</Label>
                   <Input
-                    id="employeeCode"
-                    type="text"
-                    placeholder="EMP001"
+                    id="dashboardId"
+                    type="number"
+                    placeholder="12"
                     required
-                    value={employeeCode}
-                    onChange={(e) => setEmployeeCode(e.target.value)}
+                    value={dashboardId}
+                    onChange={(e) => setDashboardId(e.target.value)}
                   />
+                  <p className="text-xs text-muted-foreground invisible">
+                    Placeholder for alignment
+                  </p>
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
                     type="email"
-                    placeholder="m@example.com"
+                    placeholder="d.jeworski@emc-direct.de"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Only @emc-direct.de email addresses are allowed
+                  </p>
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="password">Password</Label>

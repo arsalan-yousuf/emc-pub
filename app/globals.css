@@ -2816,6 +2816,21 @@ body.no-navigation .main-content {
   width: 100%;
 }
 
+/* Dashboard full width override */
+.main-content .main-container.dashboard-full-width {
+  max-width: 100%;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.main-content .main-container.dashboard-full-width iframe {
+  width: 100%;
+  height: calc(100vh - 40px);
+  min-height: 800px;
+}
+
 /* Ensure proper spacing for emailgen and other pages */
 .main-content > * {
   width: 100%;
