@@ -51,10 +51,10 @@ export default function ProtectedPage() {
           </p> */}
           <iframe
             src="https://agile-bass.metabaseapp.com/public/dashboard/51b6289f-4cde-4f7d-96e1-0fe8a04643f0"
-            frameborder="0"
+            frameBorder="0"
             width="800"
             height="600"
-            allowtransparency
+            allowTransparency
           ></iframe>
         </div>
       {/* </div> */}
