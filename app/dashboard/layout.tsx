@@ -5,7 +5,7 @@ export default function ProtectedLayout({
 }) {
   return (
     <div className="w-full h-full">
-      {children}
-    </div>
+          {children}
+        </div>
   );
 }

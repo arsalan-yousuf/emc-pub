@@ -87,75 +87,75 @@ export function SignUpForm({
           <form onSubmit={handleSignUp}>
             <div className="flex flex-col gap-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="grid gap-2">
+            <div className="grid gap-2">
                   <Label htmlFor="firstName">First Name</Label>
-                  <Input
-                    id="firstName"
-                    type="text"
-                    placeholder="John"
-                    required
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <Input
-                    id="lastName"
-                    type="text"
-                    placeholder="Doe"
-                    required
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
+                <Input
+                  id="firstName"
+                  type="text"
+                  placeholder="John"
+                  required
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input
+                  id="lastName"
+                  type="text"
+                  placeholder="Doe"
+                  required
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
                   <Label htmlFor="dashboardId">Dashboard ID</Label>
-                  <Input
+                <Input
                     id="dashboardId"
                     type="number"
                     placeholder="12"
-                    required
+                  required
                     value={dashboardId}
                     onChange={(e) => setDashboardId(e.target.value)}
-                  />
+                />
                   <p className="text-xs text-muted-foreground invisible">
                     Placeholder for alignment
                   </p>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
                     placeholder="d.jeworski@emc-direct.de"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
                   <p className="text-xs text-muted-foreground">
                     Only @emc-direct.de email addresses are allowed
                   </p>
-                </div>
-                <div className="grid gap-2">
+              </div>
+              <div className="grid gap-2">
                   <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
+                <Input
+                  id="password"
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
                   <Label htmlFor="repeat-password">Repeat Password</Label>
-                  <Input
-                    id="repeat-password"
-                    type="password"
-                    required
-                    value={repeatPassword}
-                    onChange={(e) => setRepeatPassword(e.target.value)}
-                  />
+                <Input
+                  id="repeat-password"
+                  type="password"
+                  required
+                  value={repeatPassword}
+                  onChange={(e) => setRepeatPassword(e.target.value)}
+                />
                 </div>
               </div>
               {error && <p className="text-sm text-red-500">{error}</p>}

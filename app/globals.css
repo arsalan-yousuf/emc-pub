@@ -430,10 +430,12 @@ body:not(.simple-mode) .tab-button.expert-mode-only {
 }
 
 /* Modal Styles */
-.login-modal, .settings-modal {
+.login-modal, .settings-modal, .summary-modal {
   position: fixed;
   top: 0;
   left: 0;
+  right: 0;
+  bottom: 0;
   width: 100%;
   height: 100%;
   background: rgba(0, 0, 0, 0.5);
@@ -442,6 +444,9 @@ body:not(.simple-mode) .tab-button.expert-mode-only {
   justify-content: center;
   z-index: 2000;
   backdrop-filter: blur(5px);
+  padding: 20px;
+  box-sizing: border-box;
+  margin: 0;
 }
 
 .login-modal-content {
@@ -467,6 +472,21 @@ body:not(.simple-mode) .tab-button.expert-mode-only {
   flex-direction: column;
 }
 
+.summary-modal-content {
+  background: var(--main-bg);
+  border-radius: 16px;
+  padding: 0;
+  width: 90vw;
+  max-width: 1200px;
+  max-height: 90vh;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: modalSlideIn 0.3s ease-out;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
 /* Eingabebereich */
 .input-section {
   margin-bottom: 30px;
@@ -484,19 +504,36 @@ body:not(.simple-mode) .tab-button.expert-mode-only {
   }
 }
 
-.login-header, .settings-header {
+.login-header, .settings-header, .summary-modal-header {
   background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
-  color: white;
+  color: var(--text-primary);
   padding: 20px;
   border-radius: 16px 16px 0 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+body.dark-mode .login-header,
+body.dark-mode .settings-header,
+body.dark-mode .summary-modal-header {
+  color: #ffffff;
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .login-header h3, .settings-header h3 {
   margin: 0;
   font-size: 1.2em;
+  font-weight: 600;
+  color: inherit;
+}
+
+body.dark-mode .login-header h3,
+body.dark-mode .settings-header h3 {
+  color: #ffffff;
 }
 
 .settings-header-actions {
@@ -525,8 +562,8 @@ body:not(.simple-mode) .tab-button.expert-mode-only {
 }
 
 .close-modal {
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--border-color);
   border-radius: 50%;
   width: 40px;
   height: 40px;
@@ -534,18 +571,43 @@ body:not(.simple-mode) .tab-button.expert-mode-only {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: white;
+  color: var(--text-primary);
   font-size: 1.2em;
   transition: all 0.3s ease;
 }
 
 .close-modal:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: scale(1.1);
+  background: rgba(0, 0, 0, 0.1);
+  border-color: var(--text-primary);
+  transform: scale(1.05);
 }
 
-.login-body, .settings-body {
+body.dark-mode .close-modal {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+body.dark-mode .close-modal:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.login-body, .settings-body, .summary-modal-body {
   padding: 25px;
+  flex: 1;
+  min-height: 0;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.summary-modal-scrollable {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 10px;
 }
 
 .settings-body {
@@ -943,9 +1005,10 @@ select:disabled {
 }
 
 .toast-container {
-  position: fixed;
-  top: 80px;
-  right: 20px;
+  position: fixed !important;
+  top: 20px !important;
+  right: 20px !important;
+  left: auto !important;
   z-index: 5000;
   display: flex;
   flex-direction: column;
@@ -1381,6 +1444,11 @@ button.theme-toggle {
   .settings-modal-content {
     width: 95vw;
     height: 95vh;
+  }
+  
+  .summary-modal-content {
+    width: calc(95vw - 40px);
+    max-height: calc(100vh - 40px);
   }
   
   .login-input-wrapper {
@@ -2097,8 +2165,11 @@ button.theme-toggle {
   gap: 12px;
   justify-content: flex-end;
   padding-top: 20px;
+  padding-bottom: 0;
   border-top: 1px solid var(--border-color);
   flex-wrap: wrap;
+  margin-top: auto;
+  flex-shrink: 0;
 }
 
 .action-button {

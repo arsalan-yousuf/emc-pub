@@ -15,7 +15,7 @@ async function DashboardContent() {
   
   // Get authenticated user
   const { data: { user }, error: authError } = await supabase.auth.getUser();
-  
+
   if (authError || !user) {
     redirect("/auth/login");
   }
@@ -28,7 +28,7 @@ async function DashboardContent() {
     .single();
 
   if (profileError || !profile?.dashboard_id) {
-    return (
+  return (
       <div className="w-full flex items-center justify-center p-8">
         <div className="text-center">
           <p className="text-lg text-muted-foreground mb-2">

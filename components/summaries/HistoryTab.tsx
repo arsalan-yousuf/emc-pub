@@ -1,21 +1,21 @@
 'use client';
 
 import { useState, useEffect, useMemo, memo } from 'react';
-import { Copy, Trash2, X, Inbox, Edit2 } from 'lucide-react';
-import { fetchSummaries, deleteSummary, updateSummary, SummaryWithUser } from '@/lib/summaries-db';
+import { Copy, Trash2, Inbox } from 'lucide-react';
+import { fetchSummaries, SummaryWithUser } from '@/lib/summaries-db';
 
 interface HistoryTabProps {
   showToast?: (type: 'success' | 'error' | 'warning' | 'info', message: string, duration?: number) => void;
   refreshTrigger?: number;
+  onOpenSummaryModal?: (item: SummaryWithUser) => void;
+  onRequestDelete?: (id: string) => void;
+  isDeleting?: boolean;
 }
 
-function HistoryTab({ showToast, refreshTrigger = 0 }: HistoryTabProps) {
+function HistoryTab({ showToast, refreshTrigger = 0, onOpenSummaryModal, onRequestDelete, isDeleting = false }: HistoryTabProps) {
   const [history, setHistory] = useState<SummaryWithUser[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedItem, setSelectedItem] = useState<SummaryWithUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedSummary, setEditedSummary] = useState('');
 
   // Load history from database
   useEffect(() => {
@@ -37,7 +37,8 @@ function HistoryTab({ showToast, refreshTrigger = 0 }: HistoryTabProps) {
     };
 
     loadHistory();
-  }, [showToast, refreshTrigger]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshTrigger]);
 
   // Filter history based on search
   const filteredHistory = useMemo(() => {
@@ -58,62 +59,30 @@ function HistoryTab({ showToast, refreshTrigger = 0 }: HistoryTabProps) {
     });
   }, [history, searchQuery]);
 
-  const handleDeleteItem = async (id: string) => {
-    if (confirm('Do you really want to delete this summary?')) {
-      try {
-        const result = await deleteSummary(id);
-        if (result.success) {
-          setHistory(prev => prev.filter(item => item.id !== id));
-          if (selectedItem && selectedItem.id === id) {
-            setSelectedItem(null);
-          }
-          showToast?.('success', 'Summary deleted successfully');
-        } else {
-          showToast?.('error', result.error || 'Failed to delete summary');
-        }
-      } catch (error) {
-        console.error('Error deleting summary:', error);
-        showToast?.('error', 'An error occurred while deleting the summary');
-      }
+  const handleDeleteItem = (id: string, e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    onRequestDelete?.(id);
+  };
+
+  const handleCopySummary = async (
+    text: string, 
+    type: 'summary' | 'transcript',
+    e?: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
     }
-  };
-
-  const handleCopySummary = (text: string) => {
-    navigator.clipboard.writeText(text);
-    showToast?.('success', 'Summary copied to clipboard!');
-  };
-
-  const handleEditSummary = () => {
-    if (selectedItem) {
-      setEditedSummary(selectedItem.summary);
-      setIsEditing(true);
-    }
-  };
-
-  const handleSaveEdit = async () => {
-    if (!selectedItem) return;
-
     try {
-      const result = await updateSummary(selectedItem.id!, { summary: editedSummary });
-      if (result.success) {
-        setHistory(prev => prev.map(item => 
-          item.id === selectedItem.id ? { ...item, summary: editedSummary } : item
-        ));
-        setSelectedItem({ ...selectedItem, summary: editedSummary });
-        setIsEditing(false);
-        showToast?.('success', 'Summary updated successfully');
-      } else {
-        showToast?.('error', result.error || 'Failed to update summary');
-      }
+      await navigator.clipboard.writeText(text);
+      const message = type === 'summary' 
+        ? 'Summary copied to clipboard!' 
+        : 'Transcript copied to clipboard!';
+      showToast?.('success', message);
     } catch (error) {
-      console.error('Error updating summary:', error);
-      showToast?.('error', 'An error occurred while updating the summary');
+      console.error('Failed to copy to clipboard:', error);
+      showToast?.('error', 'Failed to copy to clipboard');
     }
-  };
-
-  const handleCancelEdit = () => {
-    setIsEditing(false);
-    setEditedSummary('');
   };
 
   const formatDate = (timestamp: string) => {
@@ -134,10 +103,10 @@ function HistoryTab({ showToast, refreshTrigger = 0 }: HistoryTabProps) {
   return (
     <div className="tab-content active">
       <div className="history-container">
-        {isLoading ? (
+        {(isLoading || isDeleting) ? (
           <div className="history-loading">
             <div className="loading-spinner"></div>
-            <p>Loading summaries...</p>
+            <p>{isDeleting ? 'Deleting summary...' : 'Loading summaries...'}</p>
           </div>
         ) : (
           <>
@@ -174,10 +143,9 @@ function HistoryTab({ showToast, refreshTrigger = 0 }: HistoryTabProps) {
                     {filteredHistory.map((item) => (
                       <div 
                         key={item.id} 
-                        className={`history-item ${selectedItem?.id === item.id ? 'selected' : ''}`}
+                        className="history-item"
                         onClick={() => {
-                          setSelectedItem(item);
-                          setIsEditing(false);
+                          onOpenSummaryModal?.(item);
                         }}
                       >
                         <div className="history-header">
@@ -194,7 +162,7 @@ function HistoryTab({ showToast, refreshTrigger = 0 }: HistoryTabProps) {
                               className="history-btn"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleCopySummary(item.summary);
+                                handleCopySummary(item.summary, 'summary');
                               }}
                               title="Copy"
                             >
@@ -202,10 +170,7 @@ function HistoryTab({ showToast, refreshTrigger = 0 }: HistoryTabProps) {
                             </button>
                             <button 
                               className="history-btn"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteItem(item.id!);
-                              }}
+                              onClick={(e) => handleDeleteItem(item.id!, e)}
                               title="Delete"
                             >
                               <Trash2 className="h-4 w-4 text-red-500" />
@@ -224,118 +189,6 @@ function HistoryTab({ showToast, refreshTrigger = 0 }: HistoryTabProps) {
                   </div>
                 )}
               </div>
-          
-              {selectedItem && (
-                <div className="history-detail">
-                  <div className="history-detail-header">
-                    <h3>Summary Details</h3>
-                    <button 
-                      className="close-detail"
-                      onClick={() => {
-                        setSelectedItem(null);
-                        setIsEditing(false);
-                      }}
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <div className="history-detail-content">
-                    <div className="detail-section">
-                      <h4>Customer Information:</h4>
-                      <div className="settings-info">
-                        <p><strong>Name:</strong> {selectedItem.customer_name}</p>
-                        {selectedItem.customer_email && (
-                          <p><strong>Email:</strong> {selectedItem.customer_email}</p>
-                        )}
-                        {selectedItem.customer_phone && (
-                          <p><strong>Phone:</strong> {selectedItem.customer_phone}</p>
-                        )}
-                        <p><strong>Language:</strong> {selectedItem.language}</p>
-                        <p><strong>Created:</strong> {formatDate(selectedItem.created_at || '')}</p>
-                        {selectedItem.user_name && (
-                          <p><strong>Created by:</strong> {selectedItem.user_name} ({selectedItem.user_email})</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="detail-section">
-                      <h4>Transcript:</h4>
-                      <div className="email-content">
-                        <pre style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>{selectedItem.transcript}</pre>
-                      </div>
-                    </div>
-                    <div className="detail-section">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                        <h4>Summary:</h4>
-                        {!isEditing && (
-                          <button
-                            className="action-button"
-                            onClick={handleEditSummary}
-                            style={{ padding: '8px 16px', fontSize: '14px' }}
-                          >
-                            <Edit2 className="h-4 w-4" />
-                            Edit
-                          </button>
-                        )}
-                      </div>
-                      {isEditing ? (
-                        <div>
-                          <textarea
-                            value={editedSummary}
-                            onChange={(e) => setEditedSummary(e.target.value)}
-                            rows={15}
-                            style={{
-                              width: '100%',
-                              padding: '12px',
-                              border: '2px solid var(--border-color)',
-                              borderRadius: '8px',
-                              fontSize: '14px',
-                              background: 'var(--input-bg)',
-                              color: 'var(--text-primary)',
-                              fontFamily: 'inherit',
-                              resize: 'vertical'
-                            }}
-                          />
-                          <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                            <button
-                              className="action-button"
-                              onClick={handleSaveEdit}
-                            >
-                              Save
-                            </button>
-                            <button
-                              className="action-button"
-                              onClick={handleCancelEdit}
-                              style={{ background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="email-content">
-                          <pre style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>{selectedItem.summary}</pre>
-                        </div>
-                      )}
-                    </div>
-                    <div className="detail-actions">
-                      <button 
-                        className="action-button"
-                        onClick={() => handleCopySummary(selectedItem.summary)}
-                      >
-                        <Copy className="h-4 w-4" />
-                        Copy Summary
-                      </button>
-                      <button 
-                        className="action-button"
-                        onClick={() => handleCopySummary(selectedItem.transcript)}
-                      >
-                        <Copy className="h-4 w-4" />
-                        Copy Transcript
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </>
         )}

@@ -21,7 +21,7 @@ export function LogoutButton(props: { title?: string; isCollapsed?: boolean }) {
     }, 1000); // Redirect after 1 second regardless
     
     try {
-      const supabase = createClient();
+    const supabase = createClient();
       const { error } = await supabase.auth.signOut();
       
       if (error) {

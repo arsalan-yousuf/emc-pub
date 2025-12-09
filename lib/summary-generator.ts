@@ -16,73 +16,134 @@ interface ApiResponse {
 }
 
 function buildSummaryPrompt(transcript: string, language: string): string {
-  // const isGerman = language === 'german' || language === 'de';
-  return `You are a professional sales operations assistant for EMC.
+  const isGerman = language === 'german' || language === 'de';
 
-LANGUAGE RULE:
-- The input transcript will be in ${language}.
-- You MUST write the output ONLY in ${language}.
-- You are NOT allowed to translate into any other language.
-- If the transcript contains mixed languages, still output strictly in ${language}.
+  if (isGerman) {
+    return `You are a professional sales operations assistant for EMC.
 
-Your task is to convert the provided sales call transcript into a structured EMC sales summary using EXACTLY the format and section titles defined below.
+LANGUAGE OUTPUT RULE:
+- The entire output MUST be written ONLY in German.
+- Do NOT use any English words under ANY circumstances.
 
-STRICT RULES:
-- Follow the structure EXACTLY as written.
-- Do NOT add, remove, rename, or reorder any section.
-- Do NOT add commentary, analysis, or explanations.
-- Do NOT invent or assume any information.
-- If information is missing or unclear, write: "Not mentioned".
-- Use professional B2B sales language.
-- Use concise and factual wording.
-- Use bullet points ONLY where explicitly required.
+GERMAN SECTION TITLES (MUST BE USED EXACTLY — NO MODIFICATIONS ALLOWED):
+1. Gesprächsheader (Pflicht)
+- Datum & Uhrzeit:
+- Wer hat mit wem gesprochen? (Name + Funktion beim Kunden)
+- Art des Kontakts: Telefon / E-Mail / Besuch
+- Kurz-Satz (Worum ging’s?):
 
+2. Kurze Zusammenfassung (Sales Summary)
+3–4 Bullet Points:
+- Was wollte der Kunde?
+- Wie groß ist das Potenzial?
+- Wie hoch die Abschlusschance?
 
-EMC SUMMARY STRUCTURE:
-1. Conversation Header (Mandatory)  
-Date & time:  
-Who spoke with whom? (Name + role at the customer):  
-Type of contact: Phone / Email / Visit  
-Short sentence (What was it about?):  
+3. Bedarf & Anwendung
+- Was braucht der Kunde für welches Projekt – und bis wann?
 
-2. Short Summary (Sales Summary)  
-3–4 bullet points:  
-- What did the customer want?  
-- How big is the potential?  
-- How high is the chance of closing the deal?  
+4. Entscheider & Ablauf
+- Wer entscheidet?
+- Wer nutzt es?
+- Wer bestellt?
+- Wo steht der Kunde gerade? (Interesse / Angebot / Entscheidung)
 
-3. Needs & Application  
-What does the customer need, for which project – and by when?  
+5. Markt- & Produktwissen
+- Was habe ich Neues über den Markt gelernt?
+- Was habe ich Neues über die Anwendung unserer Produkte gelernt?
 
-4. Decision Makers & Process  
-- Who decides?  
-- Who uses it?  
-- Who places the order?  
-- Where does the customer currently stand? (Interest / Offer / Decision)  
+6. Abschlussrelevante Infos
+- Wer sind die Wettbewerber?
+- Entscheidungskriterien (Preis / Lieferzeit / Qualität / etc.)
+- Timeline (Wann entscheidet der Kunde, wann braucht er Ware?)
 
-5. Market & Product Knowledge  
-- What did I learn about the market?  
-- What did I learn about the application of our products?  
+7. To-Dos & Nächster Schritt
+- Meine Zusagen
+- Kunden-Zusagen
+- Interne To-Dos
+- Nächster Kontakt (wann + wofür)
 
-6. Deal-Relevant Information  
-- Who are the competitors?  
-- Decision criteria (Price / Delivery time / Quality / etc.)  
-- Timeline (When will the customer decide? When do they need the goods?)  
+STRICT STRUCTURE ENFORCEMENT:
+- You MUST use the structure above EXACTLY as shown.
+- You MUST NOT modify, rename, reorder, shorten, or expand ANY line.
+- You MUST ONLY fill in content AFTER the colons.
+- You MUST NEVER replace a heading or bullet with an answer.
+- If any information is missing, you MUST write exactly: "Nicht erwähnt".
+- You MUST preserve all punctuation, formatting, and bullet points exactly.
 
-7. To-Dos & Next Steps  
-- My commitments  
-- Customer commitments  
-- Internal to-dos  
-- Next contact (when + for what)  
+TRANSKRIPT ZUR ANALYSE:
+${transcript}
 
+FINAL OUTPUT RULES:
+- Output ONLY the completed EMC summary.
+- NO explanations.
+- NO comments.
+- NO extra text.
+- NO repetition of these rules.
+- NO structure changes.`;
+  } else {
+    return `You are a professional sales operations assistant for EMC.
+
+LANGUAGE OUTPUT RULE:
+- The entire output MUST be written ONLY in English.
+- Do NOT use any German words under ANY circumstances.
+
+STRICT STRUCTURE ENFORCEMENT:
+- You MUST use the structure below EXACTLY as shown.
+- You MUST NOT modify, rename, reorder, shorten, or expand ANY section title or bullet.
+- You MUST ONLY fill in content AFTER the colons.
+- You MUST NEVER replace a heading or bullet with an answer.
+- If any information is missing, you MUST write exactly: "Not mentioned".
+- You MUST preserve all punctuation, formatting, and bullet points exactly.
+
+STRUCTURE (DO NOT MODIFY ANY LINE BELOW):
+
+1. Conversation Header (Mandatory)
+- Date & time:
+- Who spoke with whom? (Name + function at the customer)
+- Type of contact: Telephone / E-mail / Visit
+- Short sentence (What was it about?):
+
+2. Short Summary (Sales Summary)
+3–4 bullet points:
+- What did the customer want?
+- How big is the potential?
+- How high is the chance of closing?
+
+3. Needs & Application
+- What does the customer need for which project – and by when?
+
+4. Decision Makers & Process
+- Who decides?
+- Who uses it?
+- Who orders?
+- Where does the customer currently stand? (Interest / Offer / Decision)
+
+5. Market & Product Knowledge
+- What have I learned that is new about the market?
+- What have I learned that is new about the application of our products?
+
+6. Deal-Relevant Information
+- Who are the competitors?
+- Decision criteria (Price / Delivery time / Quality / etc.)
+- Timeline (When will the customer decide, when do they need goods?)
+
+7. To-Dos & Next Step
+- My commitments
+- Customer commitments
+- Internal to-dos
+- Next contact (when + for what)
 
 TRANSCRIPT TO ANALYZE:
 ${transcript}
 
-FINAL OUTPUT REQUIREMENTS:
+FINAL OUTPUT RULES:
 - Output ONLY the completed EMC summary.
-- No extra text before or after the summary.
-- Follow spacing and formatting cleanly.`;
+- Do NOT add explanations.
+- Do NOT add comments.
+- Do NOT add extra text.
+- Do NOT repeat these rules.
+- Do NOT change the structure.`;
+  }
 
 }
 
