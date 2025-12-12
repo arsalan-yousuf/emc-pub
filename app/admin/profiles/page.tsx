@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { isAdmin, isSuperAdmin, getUserRole, grantRoleToUser, revokeRoleFromUser, type UserRole } from '@/lib/user-roles';
 import { useRouter } from 'next/navigation';
 import { Edit2, Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, User, Shield } from 'lucide-react';
 import EditProfileModal from '@/components/admin/EditProfileModal';
-import ConfirmationModal from '@/components/admin/ConfirmationModal';
 
 interface Profile {
   id: string;
@@ -37,10 +36,6 @@ export default function AdminProfilesPage() {
   const [sortField, setSortField] = useState<SortField>('created_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [editingProfile, setEditingProfile] = useState<ProfileWithRole | null>(null);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [confirmAction, setConfirmAction] = useState<((id?: string) => Promise<void>) | null>(null);
-  const confirmActionRef = useRef<((id?: string) => Promise<void>) | null>(null);
-  const [confirmMessage, setConfirmMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -223,10 +218,8 @@ export default function AdminProfilesPage() {
     setEditingProfile(profile);
   };
 
-  // Handle save profile (called from modal, shows confirmation first)
-  // IMPORTANT: This function ONLY sets up the confirmation modal - it does NOT save anything
-  // The actual save only happens when the user clicks "Confirm" in the ConfirmationModal
-  const handleSaveProfile = (updatedData: {
+  // Handle save profile - directly saves without confirmation
+  const handleSaveProfile = async (updatedData: {
     first_name: string;
     last_name: string;
     email: string;
@@ -262,195 +255,81 @@ export default function AdminProfilesPage() {
       }
     }
 
-    // Show confirmation with the data captured in closure
-    // Store the data separately to avoid closure issues
-    const profileToUpdate = editingProfile;
-    const dataToSave = updatedData;
-    
-    setConfirmMessage('Are you sure you want to save these changes to the profile?');
-    
-    // Create a wrapper function that prevents immediate execution
-    // This ensures the function is only called when explicitly invoked from the confirmation modal
-    const actionFunction = (() => {
-      let canExecute = false; // Flag to prevent execution until confirm is clicked
-      let executed = false; // Flag to prevent duplicate execution
+    setIsSaving(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const supabase = createClient();
       
-      return {
-        fn: async () => {
-          // Only execute if explicitly authorized (from confirmation modal)
-          if (!canExecute) {
-            console.warn('Action function called without authorization - ignoring', { canExecute, executed });
-            return;
-          }
-          
-          // Prevent duplicate execution
-          if (executed) {
-            console.warn('Action function already executed');
-            setIsSaving(false);
-            return;
-          }
-          executed = true;
-          canExecute = false; // Reset flag immediately to prevent any other calls
-          
-          console.log('Action function authorized and executing - starting save operation');
-          
-          if (!profileToUpdate) {
-            console.error('No profile to update');
-            setError('No profile selected for update.');
-            setIsSaving(false);
-            return;
-          }
-
-      setIsSaving(true);
-      setError(null);
-      setSuccess(null);
-
-      try {
-        console.log('Creating Supabase client and updating profile...', { dataToSave, profileId: profileToUpdate.id });
-        const supabase = createClient();
-        console.log('Supabase client created, making update request...');
-        
-        // Update profile data with timeout protection
-        console.log('Calling supabase.from("profiles").update()...');
-        const updatePromise = supabase
-          .from('profiles')
-          .update({
-            first_name: dataToSave.first_name,
-            last_name: dataToSave.last_name,
-            email: dataToSave.email,
-            metabase_dashboard_id: dataToSave.metabase_dashboard_id
-          })
-          .eq('id', profileToUpdate.id)
-          .select(); // Explicitly select to ensure we get a response
-        
-        // Add timeout to prevent indefinite hanging
-        const timeoutId = setTimeout(() => {
-          console.error('Update request timeout triggered');
-        }, 15000);
-        
-        console.log('Awaiting update response with 15s timeout...');
-        let updateResult: { error: any; data: any } | null = null;
-        try {
-          const result = await Promise.race([
-            updatePromise,
-            new Promise<never>((_, reject) => {
-              setTimeout(() => {
-                clearTimeout(timeoutId);
-                reject(new Error('Profile update request timed out after 15 seconds. Please check your network connection and try again.'));
-              }, 15000);
-            })
-          ]);
-          clearTimeout(timeoutId);
-          updateResult = result;
-        } catch (timeoutError) {
-          clearTimeout(timeoutId);
-          console.error('Update request timed out or failed:', timeoutError);
-          throw timeoutError;
-        }
-        
-        if (!updateResult) {
-          throw new Error('Update request returned no result');
-        }
-        
-        console.log('Update response received', { 
-          hasError: !!updateResult.error, 
-          error: updateResult.error,
-          hasData: !!updateResult.data
-        });
-        
-        if (updateResult.error) {
-          console.error('Update error:', updateResult.error);
-          throw updateResult.error;
-        }
-        
-        console.log('Profile update successful, proceeding to role handling...');
-
-        // Handle role change if different
-        console.log('Checking role changes...', { currentRole: profileToUpdate.role, newRole: dataToSave.role });
-        const currentRole = profileToUpdate.role;
-        const newRole = dataToSave.role;
-
-        if (currentRole !== newRole) {
-          console.log('Role change detected, processing role update...');
-          // Case 1: Assigning "No Role" (newRole is null) - only revoke existing role, don't grant anything
-          if (!newRole && currentRole) {
-            console.log('Case 1: Revoking role', { role: currentRole });
-            const revokeResult = await revokeRoleFromUser(profileToUpdate.id, currentRole);
-            console.log('Revoke result:', revokeResult);
-            if (!revokeResult.success) {
-              // If revoke fails because role doesn't exist, that's okay - continue
-              if (!revokeResult.error?.includes('not found') && !revokeResult.error?.includes('does not exist')) {
-                throw new Error(revokeResult.error || 'Failed to revoke role');
-              }
-            }
-          }
-          // Case 2: Assigning role from "No Role" (currentRole is null) - only grant new role, don't revoke anything
-          else if (newRole && !currentRole) {
-            console.log('Case 2: Granting role', { role: newRole });
-            const grantResult = await grantRoleToUser(profileToUpdate.id, newRole);
-            console.log('Grant result:', grantResult);
-            if (!grantResult.success) {
-              throw new Error(grantResult.error || 'Failed to grant role');
-            }
-          }
-          // Case 3: Changing from one role to another - revoke old and grant new
-          else if (currentRole && newRole) {
-            console.log('Case 3: Changing role', { from: currentRole, to: newRole });
-            // Revoke old role
-            const revokeResult = await revokeRoleFromUser(profileToUpdate.id, currentRole);
-            console.log('Revoke result:', revokeResult);
-            if (!revokeResult.success) {
-              // If revoke fails because role doesn't exist, that's okay - continue
-              if (!revokeResult.error?.includes('not found') && !revokeResult.error?.includes('does not exist')) {
-                throw new Error(revokeResult.error || 'Failed to revoke role');
-              }
-            }
-            // Grant new role
-            const grantResult = await grantRoleToUser(profileToUpdate.id, newRole);
-            console.log('Grant result:', grantResult);
-            if (!grantResult.success) {
-              throw new Error(grantResult.error || 'Failed to grant role');
-            }
-          }
-          console.log('Role update completed');
-        } else {
-          console.log('No role change needed');
-        }
-
-        console.log('Setting success message and reloading profiles...');
-        setSuccess('Profile updated successfully');
-        await loadProfiles();
-        console.log('Profiles reloaded');
-        
-        // Close edit modal after successful save
-        setEditingProfile(null);
-        
-        // Clear success message after 3 seconds
-        setTimeout(() => setSuccess(null), 3000);
-        console.log('Action function completed successfully');
-      } catch (err) {
-        console.error('Error updating profile:', err);
-        const errorMessage = err instanceof Error ? err.message : 'Failed to update profile';
-        setError(errorMessage);
-        // Keep edit modal open on error so user can retry
-        // Don't close editingProfile here
-      } finally {
-        console.log('Finally block: setting isSaving to false');
-        setIsSaving(false);
+      // Update profile data
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          first_name: updatedData.first_name,
+          last_name: updatedData.last_name,
+          email: updatedData.email,
+          metabase_dashboard_id: updatedData.metabase_dashboard_id
+        })
+        .eq('id', editingProfile.id)
+        .select();
+      
+      if (updateError) {
+        throw updateError;
       }
-        },
-        enable: () => {
-          canExecute = true;
+
+      // Handle role change if different
+      const currentRole = editingProfile.role;
+      const newRole = updatedData.role;
+
+      if (currentRole !== newRole) {
+        // Case 1: Assigning "No Role" (newRole is null) - only revoke existing role
+        if (!newRole && currentRole) {
+          const revokeResult = await revokeRoleFromUser(editingProfile.id, currentRole);
+          if (!revokeResult.success) {
+            if (!revokeResult.error?.includes('not found') && !revokeResult.error?.includes('does not exist')) {
+              throw new Error(revokeResult.error || 'Failed to revoke role');
+            }
+          }
         }
-      };
-    })();
-    
-    // Store the function (but don't allow execution yet)
-    setConfirmAction(actionFunction.fn);
-    confirmActionRef.current = actionFunction.fn;
-    // Store the enable function so we can authorize execution when confirm is clicked
-    (confirmActionRef as any).enableExecution = actionFunction.enable;
-    setShowConfirmModal(true);
+        // Case 2: Assigning role from "No Role" (currentRole is null) - only grant new role
+        else if (newRole && !currentRole) {
+          const grantResult = await grantRoleToUser(editingProfile.id, newRole);
+          if (!grantResult.success) {
+            throw new Error(grantResult.error || 'Failed to grant role');
+          }
+        }
+        // Case 3: Changing from one role to another - revoke old and grant new
+        else if (currentRole && newRole) {
+          const revokeResult = await revokeRoleFromUser(editingProfile.id, currentRole);
+          if (!revokeResult.success) {
+            if (!revokeResult.error?.includes('not found') && !revokeResult.error?.includes('does not exist')) {
+              throw new Error(revokeResult.error || 'Failed to revoke role');
+            }
+          }
+          const grantResult = await grantRoleToUser(editingProfile.id, newRole);
+          if (!grantResult.success) {
+            throw new Error(grantResult.error || 'Failed to grant role');
+          }
+        }
+      }
+
+      setSuccess('Profile updated successfully');
+      await loadProfiles();
+      
+      // Close edit modal after successful save
+      setEditingProfile(null);
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update profile';
+      setError(errorMessage);
+      // Keep edit modal open on error so user can retry
+    } finally {
+      setIsSaving(false);
+    }
   };
 
 
@@ -783,65 +662,6 @@ export default function AdminProfilesPage() {
         />
       )}
 
-      {/* Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={showConfirmModal}
-        onClose={() => {
-          if (!isSaving) {
-            setShowConfirmModal(false);
-            setConfirmAction(null);
-            confirmActionRef.current = null;
-          }
-        }}
-        onConfirm={async () => {
-          // Use ref to ensure we have the latest function, fallback to state
-          const action = confirmActionRef.current || confirmAction;
-          
-          if (!action || typeof action !== 'function') {
-            console.error('confirmAction is not a function:', typeof action, action);
-            setError('Action function not available. Please try again.');
-            setShowConfirmModal(false);
-            setConfirmAction(null);
-            confirmActionRef.current = null;
-            return;
-          }
-          
-          // Enable execution before calling the function
-          const enableExecution = (confirmActionRef as any).enableExecution;
-          if (enableExecution && typeof enableExecution === 'function') {
-            console.log('Enabling action function execution');
-            enableExecution();
-          } else {
-            console.error('enableExecution function not found');
-            setError('Cannot enable action execution. Please try again.');
-            setShowConfirmModal(false);
-            setIsSaving(false);
-            return;
-          }
-          
-          // Close confirmation modal immediately to prevent UI blocking
-          setShowConfirmModal(false);
-          setIsSaving(true);
-          
-          try {
-            console.log('Calling action function from confirmation modal - should execute now');
-            // Call the action function - it will now execute because canExecute is true
-            await action();
-            console.log('Action function completed successfully');
-          } catch (error) {
-            // Error is already handled in action, but ensure we show it
-            console.error('Error in confirmation action:', error);
-            // If action didn't set an error, set a generic one
-            setError('An unexpected error occurred. Please try again.');
-            setIsSaving(false);
-          } finally {
-            // Clean up
-            (confirmActionRef as any).enableExecution = null;
-          }
-        }}
-        message={confirmMessage}
-        title="Confirm Action"
-      />
     </div>
   );
 }

@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/client';
+import { createClient as createBrowserClient } from '@/lib/supabase/client';
+import { createClient as createServerClient } from '@/lib/supabase/server';
 
 export type UserRole = 'super_admin' | 'admin' | 'sales_support' | 'sales';
 
@@ -7,7 +8,7 @@ export type UserRole = 'super_admin' | 'admin' | 'sales_support' | 'sales';
  */
 export async function getUserRoles(): Promise<UserRole[]> {
   try {
-    const supabase = createClient();
+    const supabase = createBrowserClient();
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {
@@ -24,7 +25,7 @@ export async function getUserRoles(): Promise<UserRole[]> {
       return [];
     }
 
-    return (data || []).map(item => item.role as UserRole);
+    return (data || []).map((item: { role: string }) => item.role as UserRole);
   } catch (error) {
     console.error('Error getting user roles:', error);
     return [];
@@ -57,10 +58,20 @@ export async function isSuperAdmin(): Promise<boolean> {
 
 /**
  * Get a user's role (single role - first one found)
+ * Works in both client and server contexts
  */
-export async function getUserRole(userId: string): Promise<UserRole | null> {
+export async function getUserRole(userId: string, useServerClient: boolean = false): Promise<UserRole | null> {
   try {
-    const supabase = createClient();
+    // Use server client if specified (for server actions) or try to detect
+    const supabase = useServerClient 
+      ? await createServerClient()
+      : createBrowserClient();
+    
+    // First, get the current user to check if we're querying our own role
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    
+    // If querying own role, use direct query (allowed by RLS)
+    // If querying another user's role, we need to be admin/super_admin (also allowed by RLS)
     const { data, error } = await supabase
       .from('user_roles')
       .select('role')
@@ -69,12 +80,38 @@ export async function getUserRole(userId: string): Promise<UserRole | null> {
       .maybeSingle();
     
     if (error) {
-      // If 406 error (RLS policy issue), try alternative approach
-      if (error.code === 'PGRST116' || error.message?.includes('406')) {
-        console.warn('Direct user_roles access blocked, user may not have role assigned');
+      console.error('Error getting user role - details:', {
+        errorCode: error.code,
+        errorMessage: error.message,
+        errorDetails: error.details,
+        errorHint: error.hint,
+        userId,
+        currentUserId: currentUser?.id,
+        isQueryingOwnRole: currentUser?.id === userId
+      });
+      
+      // If 406 error (RLS policy issue), try alternative approach using RPC
+      if (error.code === 'PGRST116' || error.message?.includes('406') || error.code === '42501') {
+        console.warn('Direct user_roles access blocked by RLS, trying RPC function');
+        
+        // Try using user_has_role RPC for each role type
+        const roles: UserRole[] = ['super_admin', 'admin', 'sales_support', 'sales'];
+        for (const role of roles) {
+          try {
+            const { data: hasRole } = await supabase.rpc('user_has_role', {
+              p_user: userId,
+              p_role: role
+            });
+            if (hasRole === true) {
+              return role;
+            }
+          } catch (rpcError) {
+            // Continue to next role
+            continue;
+          }
+        }
         return null;
       }
-      console.error('Error getting user role:', error);
       return null;
     }
 
@@ -94,7 +131,7 @@ export async function getUserRole(userId: string): Promise<UserRole | null> {
  */
 export async function grantRoleToUser(userId: string, role: UserRole): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = createClient();
+    const supabase = createBrowserClient();
     const { error } = await supabase.rpc('grant_role', {
       p_target: userId,
       p_role: role
@@ -125,7 +162,7 @@ export async function grantRoleToUser(userId: string, role: UserRole): Promise<{
  */
 export async function revokeRoleFromUser(userId: string, role: UserRole): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = createClient();
+    const supabase = createBrowserClient();
     const { error } = await supabase.rpc('revoke_role', {
       p_target: userId,
       p_role: role

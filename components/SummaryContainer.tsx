@@ -4,11 +4,14 @@ import { useState, useEffect } from 'react';
 import TabNavigation from './summaries/TabNavigation';
 import GeneratorTab from './summaries/GeneratorTab';
 import HistoryTab from './summaries/HistoryTab';
+import ViewSummariesTab from './summaries/ViewSummariesTab';
 import SummaryDetailsModal from './summaries/SummaryDetailsModal';
 import DeleteConfirmationModal from './summaries/DeleteConfirmationModal';
 import { CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react';
 import { SummaryWithUser } from '@/lib/summaries-db';
 import { deleteSummary } from '@/lib/summaries-db';
+import { isAdmin, getUserRole } from '@/lib/user-roles';
+import { createClient } from '@/lib/supabase/client';
 
 export default function SummaryContainer() {
   const [activeTab, setActiveTab] = useState('generator');
@@ -20,9 +23,25 @@ export default function SummaryContainer() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [summaryToDelete, setSummaryToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showViewSummaries, setShowViewSummaries] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
+    
+    // Check if user can view summaries tab
+    const checkViewAccess = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const role = await getUserRole(user.id);
+        // Show tab for super_admin, admin, or sales_support
+        if (role === 'super_admin' || role === 'admin' || role === 'sales_support') {
+          setShowViewSummaries(true);
+        }
+      }
+    };
+    
+    checkViewAccess();
   }, []);
 
   const showToast = (type: 'success' | 'error' | 'warning' | 'info', message: string, duration: number = 3000) => {
@@ -117,6 +136,7 @@ export default function SummaryContainer() {
         <TabNavigation
           activeTab={activeTab}
           onTabChange={setActiveTab}
+          showViewSummaries={showViewSummaries}
         />
 
         <div className="tab-content-container">
@@ -135,6 +155,15 @@ export default function SummaryContainer() {
               isDeleting={isDeleting}
             />
           )}
+          {activeTab === 'view-summaries' && showViewSummaries && (
+            <ViewSummariesTab 
+              showToast={showToast} 
+              refreshTrigger={historyRefreshTrigger}
+              onOpenSummaryModal={handleOpenSummaryModal}
+              onRequestDelete={handleRequestDelete}
+              isDeleting={isDeleting}
+            />
+          )}
         </div>
       </div>
 
@@ -144,6 +173,10 @@ export default function SummaryContainer() {
         onClose={handleCloseSummaryModal}
         selectedItem={selectedSummaryItem}
         onCopySummary={handleCopySummary}
+        onSummaryUpdated={() => {
+          setHistoryRefreshTrigger(prev => prev + 1);
+          showToast('success', 'Summary updated successfully');
+        }}
       />
 
       {/* Delete Confirmation Modal */}

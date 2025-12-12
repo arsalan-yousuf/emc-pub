@@ -1,12 +1,13 @@
 'use client';
-import { Mic, History } from 'lucide-react';
+import { Mic, History, Eye } from 'lucide-react';
 
 interface TabNavigationProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
+  showViewSummaries?: boolean;
 }
 
-export default function TabNavigation({ activeTab, onTabChange }: TabNavigationProps) {
+export default function TabNavigation({ activeTab, onTabChange, showViewSummaries = false }: TabNavigationProps) {
   return (
     <div className="tab-navigation">
       <button 
@@ -23,6 +24,15 @@ export default function TabNavigation({ activeTab, onTabChange }: TabNavigationP
         <History className="h-6 w-6" style={{ color: activeTab === 'history' ? '#2563eb' : 'inherit' }} />
         History
       </button>
+      {showViewSummaries && (
+        <button 
+          className={`tab-button ${activeTab === 'view-summaries' ? 'active' : ''}`}
+          onClick={() => onTabChange('view-summaries')}
+        >
+          <Eye className="h-6 w-6" style={{ color: activeTab === 'view-summaries' ? '#2563eb' : 'inherit' }} />
+          View Summaries
+        </button>
+      )}
     </div>
   );
 }

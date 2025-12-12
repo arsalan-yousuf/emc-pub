@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getUserRole as getUserRoleFromTable, type UserRole } from "@/lib/user-roles";
 
 export interface SummaryData {
   id?: string;
@@ -26,7 +27,7 @@ export async function saveSummary(data: Omit<SummaryData, 'id' | 'created_at' | 
     const supabase = await createClient();
     
     const { data: summary, error } = await supabase
-      .from('callsummaries')
+      .from('sales_summaries')
       .insert({
         user_id: data.user_id,
         customer_name: data.customer_name,
@@ -60,7 +61,7 @@ export async function updateSummary(id: string, updates: Partial<SummaryData>): 
     const supabase = await createClient();
     
     const { error } = await supabase
-      .from('callsummaries')
+      .from('sales_summaries')
       .update({
         ...updates,
         updated_at: new Date().toISOString()
@@ -82,41 +83,20 @@ export async function updateSummary(id: string, updates: Partial<SummaryData>): 
   }
 }
 
-// Get user's role
+// Get user's role - using the user-roles helper function (server version)
 async function getUserRole(userId: string): Promise<string | null> {
   try {
-    const supabase = await createClient();
-    
-    // First try to get role from users table
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', userId)
-      .single();
-
-    if (!userError && userData?.role) {
-      return userData.role;
-    }
-
-    // Fallback: try to get role from user_metadata
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (!authError && user) {
-      const role = user.user_metadata?.role || user.app_metadata?.role;
-      if (role) {
-        return role;
-      }
-    }
-
-    // Default to 'sales' if no role found
-    return 'sales';
+    // Use the helper function from user-roles.ts with server client flag
+    const role = await getUserRoleFromTable(userId, true);
+    return role;
   } catch (error) {
     console.error('Error getting user role:', error);
-    // Default to 'sales' on error
-    return 'sales';
+    return null;
   }
 }
 
-// Fetch summaries with role-based access
+// Fetch summaries - only returns the current logged-in user's summaries
+// This is used for the History tab, which should only show the user's own summaries
 export async function fetchSummaries(): Promise<{ success: boolean; data?: SummaryWithUser[]; error?: string }> {
   try {
     const supabase = await createClient();
@@ -128,25 +108,12 @@ export async function fetchSummaries(): Promise<{ success: boolean; data?: Summa
       return { success: false, error: 'User not authenticated' };
     }
 
-    // Get user role
-    const role = await getUserRole(user.id);
-    
-    // Build query - try to join with users table if it exists, otherwise just get summaries
-    let query = supabase
-      .from('callsummaries')
+    // Always filter by current user's ID - History tab should only show user's own summaries
+    const { data, error } = await supabase
+      .from('sales_summaries')
       .select('*')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
-
-    // Apply role-based filtering
-    if (role === 'admin' || role === 'sales-support') {
-      // Admin and sales-support can see all summaries
-      // No filter needed
-    } else {
-      // Sales can only see their own summaries
-      query = query.eq('user_id', user.id);
-    }
-
-    const { data, error } = await query;
 
     if (error) {
       console.error('Error fetching summaries:', error);
@@ -180,6 +147,127 @@ export async function fetchSummaries(): Promise<{ success: boolean; data?: Summa
   }
 }
 
+// Fetch summaries for "View Summaries" tab with hierarchical access
+// Excludes current user's own summaries (those are in History tab)
+export async function fetchAllSummariesForView(): Promise<{ success: boolean; data?: SummaryWithUser[]; error?: string }> {
+  try {
+    const supabase = await createClient();
+    
+    // Get current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+      return { success: false, error: 'User not authenticated' };
+    }
+
+    // Get current user's role - use server client since this is a server action
+    const currentUserRole = await getUserRole(user.id);
+    
+    if (!currentUserRole || (currentUserRole !== 'super_admin' && currentUserRole !== 'admin' && currentUserRole !== 'sales_support')) {
+      return { success: false, error: 'Access denied' };
+    }
+
+    // Get all summaries (excluding current user's own summaries)
+    const { data: summariesData, error: summariesError } = await supabase
+      .from('sales_summaries')
+      .select('*')
+      .neq('user_id', user.id) // Exclude current user's own summaries
+      .order('created_at', { ascending: false });
+
+    if (summariesError) {
+      console.error('Error fetching summaries:', summariesError);
+      return { success: false, error: summariesError.message };
+    }
+
+    if (!summariesData || summariesData.length === 0) {
+      return { success: true, data: [] };
+    }
+
+    // Get unique user IDs from summaries
+    const uniqueUserIds = [...new Set(summariesData.map((s: any) => s.user_id))];
+
+    // Fetch profiles for all unique user IDs
+    const { data: profilesData, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name, email')
+      .in('id', uniqueUserIds);
+
+    if (profilesError) {
+      console.error('Error fetching profiles:', profilesError);
+      // Continue without profile data if profiles can't be fetched
+    }
+
+    // Create a map of user_id -> profile for quick lookup
+    const profileMap = new Map<string, any>();
+    if (profilesData) {
+      profilesData.forEach((profile: any) => {
+        profileMap.set(profile.id, profile);
+      });
+    }
+
+    // Get all user roles to filter hierarchically
+    const { data: allUserRoles } = await supabase
+      .from('user_roles')
+      .select('user_id, role');
+
+    const userRoleMap = new Map<string, string>();
+    if (allUserRoles) {
+      allUserRoles.forEach((ur: any) => {
+        userRoleMap.set(ur.user_id, ur.role);
+      });
+    }
+
+    // Filter summaries based on hierarchical access
+    let filteredSummaries = summariesData.filter((item: any) => {
+      const summaryOwnerRole = userRoleMap.get(item.user_id);
+      
+      if (currentUserRole === 'super_admin') {
+        // Super admins can see all summaries (except own, already filtered)
+        return true;
+      } else if (currentUserRole === 'admin') {
+        // Admins can see all except super_admins
+        return summaryOwnerRole !== 'super_admin';
+      } else if (currentUserRole === 'sales_support') {
+        // Sales-support can see sales and sales_support only
+        return summaryOwnerRole === 'sales' || summaryOwnerRole === 'sales_support';
+      }
+      
+      return false;
+    });
+
+    // Transform data with profile information
+    const summaries: SummaryWithUser[] = filteredSummaries.map((item: any) => {
+      const profile = profileMap.get(item.user_id);
+      const userName = profile?.first_name && profile?.last_name
+        ? `${profile.first_name} ${profile.last_name}`
+        : profile?.first_name || profile?.last_name || profile?.email || 'Unknown User';
+      
+      return {
+        id: item.id,
+        user_id: item.user_id,
+        customer_name: item.customer_name,
+        customer_email: item.customer_email,
+        customer_phone: item.customer_phone,
+        transcript: item.transcript,
+        summary: item.summary,
+        language: item.language,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        user_email: profile?.email || '',
+        user_name: userName
+      };
+    });
+
+    return { success: true, data: summaries };
+  } catch (error) {
+    console.error('Error fetching summaries for view:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to fetch summaries' 
+    };
+  }
+}
+
 // Delete summary
 export async function deleteSummary(id: string): Promise<{ success: boolean; error?: string }> {
   try {
@@ -197,7 +285,7 @@ export async function deleteSummary(id: string): Promise<{ success: boolean; err
     
     // Build query
     let query = supabase
-      .from('callsummaries')
+      .from('sales_summaries')
       .delete()
       .eq('id', id);
 
