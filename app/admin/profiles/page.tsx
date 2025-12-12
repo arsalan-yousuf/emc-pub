@@ -1,0 +1,848 @@
+'use client';
+
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { isAdmin, isSuperAdmin, getUserRole, grantRoleToUser, revokeRoleFromUser, type UserRole } from '@/lib/user-roles';
+import { useRouter } from 'next/navigation';
+import { Edit2, Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, User, Shield } from 'lucide-react';
+import EditProfileModal from '@/components/admin/EditProfileModal';
+import ConfirmationModal from '@/components/admin/ConfirmationModal';
+
+interface Profile {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  metabase_dashboard_id: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ProfileWithRole extends Profile {
+  role: UserRole | null;
+}
+
+type SortField = 'first_name' | 'last_name' | 'email' | 'created_at';
+type SortDirection = 'asc' | 'desc';
+
+export default function AdminProfilesPage() {
+  const router = useRouter();
+  const [profiles, setProfiles] = useState<ProfileWithRole[]>([]);
+  const [filteredProfiles, setFilteredProfiles] = useState<ProfileWithRole[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [currentUserIsSuperAdmin, setCurrentUserIsSuperAdmin] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortField, setSortField] = useState<SortField>('created_at');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [editingProfile, setEditingProfile] = useState<ProfileWithRole | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<((id?: string) => Promise<void>) | null>(null);
+  const confirmActionRef = useRef<((id?: string) => Promise<void>) | null>(null);
+  const [confirmMessage, setConfirmMessage] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  const itemsPerPage = 10;
+
+  // Check authorization
+  useEffect(() => {
+    const checkAuth = async () => {
+      const admin = await isAdmin();
+      if (!admin) {
+        router.push('/dashboard');
+        return;
+      }
+      setIsAuthorized(true);
+      const superAdmin = await isSuperAdmin();
+      setCurrentUserIsSuperAdmin(superAdmin);
+      
+      // Get current user ID
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentUserId(user.id);
+      }
+      
+      loadProfiles();
+    };
+    checkAuth();
+  }, [router]);
+
+  // Load profiles
+  const loadProfiles = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const supabase = createClient();
+      
+      // Fetch profiles (RLS will handle access control)
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (profilesError) {
+        console.error('Profiles fetch error:', profilesError);
+        throw new Error(profilesError.message || 'Failed to load profiles. Please check your permissions.');
+      }
+
+      if (!profilesData) {
+        setProfiles([]);
+        setIsLoading(false);
+        return;
+      }
+      // Fetch roles for each profile
+      const profilesWithRoles: ProfileWithRole[] = await Promise.all(
+        profilesData.map(async (profile) => {
+          try {
+            const role = await getUserRole(profile.id);
+            return {
+              ...profile,
+              role
+            };
+          } catch (err) {
+            console.error(`Error fetching role for profile ${profile.id}:`, err);
+            return {
+              ...profile,
+              role: null
+            };
+          }
+        })
+      );
+
+      setProfiles(profilesWithRoles);
+    } catch (err) {
+      console.error('Error loading profiles:', err);
+      const errorMessage = err instanceof Error 
+        ? err.message 
+        : typeof err === 'object' && err !== null && 'message' in err
+        ? String(err.message)
+        : 'Failed to load profiles. Please check your permissions and ensure RLS policies are configured correctly.';
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Filter and sort profiles
+  useEffect(() => {
+    let filtered = [...profiles];
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(profile => {
+        const firstName = profile.first_name?.toLowerCase() || '';
+        const lastName = profile.last_name?.toLowerCase() || '';
+        const email = profile.email?.toLowerCase() || '';
+        const fullName = `${firstName} ${lastName}`.trim();
+        return fullName.includes(query) || email.includes(query);
+      });
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let aValue: string | number | null = null;
+      let bValue: string | number | null = null;
+
+      switch (sortField) {
+        case 'first_name':
+          aValue = a.first_name || '';
+          bValue = b.first_name || '';
+          break;
+        case 'last_name':
+          aValue = a.last_name || '';
+          bValue = b.last_name || '';
+          break;
+        case 'email':
+          aValue = a.email || '';
+          bValue = b.email || '';
+          break;
+        case 'created_at':
+          aValue = new Date(a.created_at).getTime();
+          bValue = new Date(b.created_at).getTime();
+          break;
+      }
+
+      if (aValue === null && bValue === null) return 0;
+      if (aValue === null) return 1;
+      if (bValue === null) return -1;
+
+      const comparison = aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    setFilteredProfiles(filtered);
+    setCurrentPage(1); // Reset to first page when filter changes
+  }, [profiles, searchQuery, sortField, sortDirection]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredProfiles.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedProfiles = filteredProfiles.slice(startIndex, endIndex);
+
+  // Handle sort
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  // Check if current user can edit a profile
+  const canEditProfile = (profile: ProfileWithRole): boolean => {
+    // Super admins can edit anyone
+    if (currentUserIsSuperAdmin) {
+      return true;
+    }
+    // Users can always edit their own profile
+    if (currentUserId && profile.id === currentUserId) {
+      return true;
+    }
+    // Admins can only edit sales and sales_support, not admin or super_admin
+    if (profile.role === 'admin' || profile.role === 'super_admin') {
+      return false;
+    }
+    return true;
+  };
+
+  // Handle edit
+  const handleEdit = (profile: ProfileWithRole) => {
+    if (!canEditProfile(profile)) {
+      setError('You do not have permission to edit this profile. Only super admins can edit admin and super admin profiles.');
+      setTimeout(() => setError(null), 5000);
+      return;
+    }
+    setEditingProfile(profile);
+  };
+
+  // Handle save profile (called from modal, shows confirmation first)
+  // IMPORTANT: This function ONLY sets up the confirmation modal - it does NOT save anything
+  // The actual save only happens when the user clicks "Confirm" in the ConfirmationModal
+  const handleSaveProfile = (updatedData: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    metabase_dashboard_id: number | null;
+    role: UserRole | null;
+  }) => {
+    if (!editingProfile) {
+      return;
+    }
+
+    // Double-check permissions before saving
+    if (!canEditProfile(editingProfile)) {
+      setError('You do not have permission to edit this profile. Only super admins can edit admin and super admin profiles.');
+      setEditingProfile(null);
+      return;
+    }
+
+    // Prevent admins from assigning admin or super_admin roles to other users
+    const isEditingOwnProfile = currentUserId && editingProfile.id === currentUserId;
+    if (!currentUserIsSuperAdmin && !isEditingOwnProfile && (updatedData.role === 'admin' || updatedData.role === 'super_admin')) {
+      setError('You do not have permission to assign admin or super admin roles.');
+      setEditingProfile(null);
+      return;
+    }
+
+    // Prevent admins from changing their own role (must keep current role)
+    if (!currentUserIsSuperAdmin && isEditingOwnProfile) {
+      const currentRole = editingProfile.role;
+      if (updatedData.role !== currentRole) {
+        setError('You cannot change your own role.');
+        setEditingProfile(null);
+        return;
+      }
+    }
+
+    // Show confirmation with the data captured in closure
+    // Store the data separately to avoid closure issues
+    const profileToUpdate = editingProfile;
+    const dataToSave = updatedData;
+    
+    setConfirmMessage('Are you sure you want to save these changes to the profile?');
+    
+    // Create a wrapper function that prevents immediate execution
+    // This ensures the function is only called when explicitly invoked from the confirmation modal
+    const actionFunction = (() => {
+      let canExecute = false; // Flag to prevent execution until confirm is clicked
+      let executed = false; // Flag to prevent duplicate execution
+      
+      return {
+        fn: async () => {
+          // Only execute if explicitly authorized (from confirmation modal)
+          if (!canExecute) {
+            console.warn('Action function called without authorization - ignoring', { canExecute, executed });
+            return;
+          }
+          
+          // Prevent duplicate execution
+          if (executed) {
+            console.warn('Action function already executed');
+            setIsSaving(false);
+            return;
+          }
+          executed = true;
+          canExecute = false; // Reset flag immediately to prevent any other calls
+          
+          console.log('Action function authorized and executing - starting save operation');
+          
+          if (!profileToUpdate) {
+            console.error('No profile to update');
+            setError('No profile selected for update.');
+            setIsSaving(false);
+            return;
+          }
+
+      setIsSaving(true);
+      setError(null);
+      setSuccess(null);
+
+      try {
+        console.log('Creating Supabase client and updating profile...', { dataToSave, profileId: profileToUpdate.id });
+        const supabase = createClient();
+        console.log('Supabase client created, making update request...');
+        
+        // Update profile data with timeout protection
+        console.log('Calling supabase.from("profiles").update()...');
+        const updatePromise = supabase
+          .from('profiles')
+          .update({
+            first_name: dataToSave.first_name,
+            last_name: dataToSave.last_name,
+            email: dataToSave.email,
+            metabase_dashboard_id: dataToSave.metabase_dashboard_id
+          })
+          .eq('id', profileToUpdate.id)
+          .select(); // Explicitly select to ensure we get a response
+        
+        // Add timeout to prevent indefinite hanging
+        const timeoutId = setTimeout(() => {
+          console.error('Update request timeout triggered');
+        }, 15000);
+        
+        console.log('Awaiting update response with 15s timeout...');
+        let updateResult: { error: any; data: any } | null = null;
+        try {
+          const result = await Promise.race([
+            updatePromise,
+            new Promise<never>((_, reject) => {
+              setTimeout(() => {
+                clearTimeout(timeoutId);
+                reject(new Error('Profile update request timed out after 15 seconds. Please check your network connection and try again.'));
+              }, 15000);
+            })
+          ]);
+          clearTimeout(timeoutId);
+          updateResult = result;
+        } catch (timeoutError) {
+          clearTimeout(timeoutId);
+          console.error('Update request timed out or failed:', timeoutError);
+          throw timeoutError;
+        }
+        
+        if (!updateResult) {
+          throw new Error('Update request returned no result');
+        }
+        
+        console.log('Update response received', { 
+          hasError: !!updateResult.error, 
+          error: updateResult.error,
+          hasData: !!updateResult.data
+        });
+        
+        if (updateResult.error) {
+          console.error('Update error:', updateResult.error);
+          throw updateResult.error;
+        }
+        
+        console.log('Profile update successful, proceeding to role handling...');
+
+        // Handle role change if different
+        console.log('Checking role changes...', { currentRole: profileToUpdate.role, newRole: dataToSave.role });
+        const currentRole = profileToUpdate.role;
+        const newRole = dataToSave.role;
+
+        if (currentRole !== newRole) {
+          console.log('Role change detected, processing role update...');
+          // Case 1: Assigning "No Role" (newRole is null) - only revoke existing role, don't grant anything
+          if (!newRole && currentRole) {
+            console.log('Case 1: Revoking role', { role: currentRole });
+            const revokeResult = await revokeRoleFromUser(profileToUpdate.id, currentRole);
+            console.log('Revoke result:', revokeResult);
+            if (!revokeResult.success) {
+              // If revoke fails because role doesn't exist, that's okay - continue
+              if (!revokeResult.error?.includes('not found') && !revokeResult.error?.includes('does not exist')) {
+                throw new Error(revokeResult.error || 'Failed to revoke role');
+              }
+            }
+          }
+          // Case 2: Assigning role from "No Role" (currentRole is null) - only grant new role, don't revoke anything
+          else if (newRole && !currentRole) {
+            console.log('Case 2: Granting role', { role: newRole });
+            const grantResult = await grantRoleToUser(profileToUpdate.id, newRole);
+            console.log('Grant result:', grantResult);
+            if (!grantResult.success) {
+              throw new Error(grantResult.error || 'Failed to grant role');
+            }
+          }
+          // Case 3: Changing from one role to another - revoke old and grant new
+          else if (currentRole && newRole) {
+            console.log('Case 3: Changing role', { from: currentRole, to: newRole });
+            // Revoke old role
+            const revokeResult = await revokeRoleFromUser(profileToUpdate.id, currentRole);
+            console.log('Revoke result:', revokeResult);
+            if (!revokeResult.success) {
+              // If revoke fails because role doesn't exist, that's okay - continue
+              if (!revokeResult.error?.includes('not found') && !revokeResult.error?.includes('does not exist')) {
+                throw new Error(revokeResult.error || 'Failed to revoke role');
+              }
+            }
+            // Grant new role
+            const grantResult = await grantRoleToUser(profileToUpdate.id, newRole);
+            console.log('Grant result:', grantResult);
+            if (!grantResult.success) {
+              throw new Error(grantResult.error || 'Failed to grant role');
+            }
+          }
+          console.log('Role update completed');
+        } else {
+          console.log('No role change needed');
+        }
+
+        console.log('Setting success message and reloading profiles...');
+        setSuccess('Profile updated successfully');
+        await loadProfiles();
+        console.log('Profiles reloaded');
+        
+        // Close edit modal after successful save
+        setEditingProfile(null);
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => setSuccess(null), 3000);
+        console.log('Action function completed successfully');
+      } catch (err) {
+        console.error('Error updating profile:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Failed to update profile';
+        setError(errorMessage);
+        // Keep edit modal open on error so user can retry
+        // Don't close editingProfile here
+      } finally {
+        console.log('Finally block: setting isSaving to false');
+        setIsSaving(false);
+      }
+        },
+        enable: () => {
+          canExecute = true;
+        }
+      };
+    })();
+    
+    // Store the function (but don't allow execution yet)
+    setConfirmAction(actionFunction.fn);
+    confirmActionRef.current = actionFunction.fn;
+    // Store the enable function so we can authorize execution when confirm is clicked
+    (confirmActionRef as any).enableExecution = actionFunction.enable;
+    setShowConfirmModal(true);
+  };
+
+
+  if (!isAuthorized) {
+    return (
+      <div className="main-container">
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <div className="loading" style={{ margin: '0 auto' }}></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="main-container">
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <div className="loading" style={{ margin: '0 auto' }}></div>
+          <p style={{ marginTop: '20px', color: 'var(--text-secondary)' }}>Loading profiles...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="main-container">
+      <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
+        <div style={{ marginBottom: '24px' }}>
+          <h1 style={{ fontSize: '28px', fontWeight: '600', marginBottom: '8px', color: 'var(--text-primary)' }}>
+            User Profiles Management
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
+            Manage user profiles and assign roles
+          </p>
+        </div>
+
+        {/* Search */}
+        <div style={{ marginBottom: '24px', position: 'relative' }}>
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by name or email..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '10px 12px 10px 40px',
+              border: '1px solid var(--border-color)',
+              borderRadius: '8px',
+              background: 'var(--input-bg)',
+              color: 'var(--text-primary)',
+              fontSize: '14px'
+            }}
+          />
+        </div>
+
+        {/* Messages */}
+        {error && (
+          <div style={{
+            padding: '12px 16px',
+            marginBottom: '16px',
+            background: 'var(--danger-bg)',
+            border: '1px solid var(--danger-border)',
+            borderRadius: '8px',
+            color: 'var(--danger-text)',
+            fontSize: '14px'
+          }}>
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div style={{
+            padding: '12px 16px',
+            marginBottom: '16px',
+            background: 'var(--success-bg)',
+            border: '1px solid var(--success-border)',
+            borderRadius: '8px',
+            color: 'var(--success-text)',
+            fontSize: '14px'
+          }}>
+            {success}
+          </div>
+        )}
+
+        {/* Table */}
+        <div style={{
+          background: 'var(--card)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '12px',
+          overflow: 'hidden'
+        }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: 'var(--section-bg)', borderBottom: '2px solid var(--border-color)' }}>
+                  <th
+                    style={{
+                      padding: '16px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      fontSize: '13px',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      userSelect: 'none'
+                    }}
+                    onClick={() => handleSort('first_name')}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      First Name
+                      {sortField === 'first_name' && (
+                        sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                      )}
+                    </div>
+                  </th>
+                  <th
+                    style={{
+                      padding: '16px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      fontSize: '13px',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      userSelect: 'none'
+                    }}
+                    onClick={() => handleSort('last_name')}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      Last Name
+                      {sortField === 'last_name' && (
+                        sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                      )}
+                    </div>
+                  </th>
+                  <th
+                    style={{
+                      padding: '16px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      fontSize: '13px',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      userSelect: 'none'
+                    }}
+                    onClick={() => handleSort('email')}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      Email
+                      {sortField === 'email' && (
+                        sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                      )}
+                    </div>
+                  </th>
+                  <th style={{ padding: '16px', textAlign: 'left', fontWeight: '600', fontSize: '13px', color: 'var(--text-primary)' }}>
+                    Metabase Dashboard ID
+                  </th>
+                  <th style={{ padding: '16px', textAlign: 'left', fontWeight: '600', fontSize: '13px', color: 'var(--text-primary)' }}>
+                    Role
+                  </th>
+                  <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', fontSize: '13px', color: 'var(--text-primary)' }}>
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedProfiles.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                      {searchQuery ? 'No profiles found matching your search' : 'No profiles found'}
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedProfiles.map((profile) => (
+                    <tr
+                      key={profile.id}
+                      style={{
+                        borderBottom: '1px solid var(--border-color)',
+                        transition: 'background 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'var(--section-bg)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                      }}
+                    >
+                      <td style={{ padding: '16px', color: 'var(--text-primary)' }}>
+                        {profile.first_name || '-'}
+                      </td>
+                      <td style={{ padding: '16px', color: 'var(--text-primary)' }}>
+                        {profile.last_name || '-'}
+                      </td>
+                      <td style={{ padding: '16px', color: 'var(--text-primary)' }}>
+                        {profile.email || '-'}
+                      </td>
+                      <td style={{ padding: '16px', color: 'var(--text-primary)' }}>
+                        {profile.metabase_dashboard_id || '-'}
+                      </td>
+                      <td style={{ padding: '16px', color: 'var(--text-primary)' }}>
+                        {profile.role ? (
+                          <span style={{
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            background: 'var(--section-bg)',
+                            fontSize: '13px',
+                            textTransform: 'capitalize'
+                          }}>
+                            {profile.role.replace('_', ' ')}
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>No Role</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '16px', textAlign: 'right' }}>
+                        {canEditProfile(profile) ? (
+                          <button
+                            onClick={() => handleEdit(profile)}
+                            disabled={isSaving}
+                            style={{
+                              padding: '8px 12px',
+                              background: 'transparent',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '6px',
+                              color: 'var(--text-primary)',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              fontSize: '13px',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'var(--section-bg)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'transparent';
+                            }}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                            Edit
+                          </button>
+                        ) : (
+                          <span style={{
+                            padding: '8px 12px',
+                            color: 'var(--text-secondary)',
+                            fontSize: '13px',
+                            fontStyle: 'italic'
+                          }}>
+                            Restricted
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div style={{
+              padding: '16px',
+              borderTop: '1px solid var(--border-color)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
+                Showing {startIndex + 1} to {Math.min(endIndex, filteredProfiles.length)} of {filteredProfiles.length} profiles
+              </div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  style={{
+                    padding: '8px 12px',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '6px',
+                    background: currentPage === 1 ? 'var(--section-bg)' : 'var(--input-bg)',
+                    color: 'var(--text-primary)',
+                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '13px'
+                  }}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </button>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '14px', padding: '0 8px' }}>
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  style={{
+                    padding: '8px 12px',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '6px',
+                    background: currentPage === totalPages ? 'var(--section-bg)' : 'var(--input-bg)',
+                    color: 'var(--text-primary)',
+                    cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '13px'
+                  }}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Edit Modal */}
+      {editingProfile && (
+        <EditProfileModal
+          profile={editingProfile}
+          isOpen={true}
+          onClose={() => setEditingProfile(null)}
+          onSave={handleSaveProfile}
+          isSaving={isSaving}
+          currentUserIsSuperAdmin={currentUserIsSuperAdmin}
+          isEditingOwnProfile={currentUserId ? editingProfile.id === currentUserId : false}
+        />
+      )}
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        onClose={() => {
+          if (!isSaving) {
+            setShowConfirmModal(false);
+            setConfirmAction(null);
+            confirmActionRef.current = null;
+          }
+        }}
+        onConfirm={async () => {
+          // Use ref to ensure we have the latest function, fallback to state
+          const action = confirmActionRef.current || confirmAction;
+          
+          if (!action || typeof action !== 'function') {
+            console.error('confirmAction is not a function:', typeof action, action);
+            setError('Action function not available. Please try again.');
+            setShowConfirmModal(false);
+            setConfirmAction(null);
+            confirmActionRef.current = null;
+            return;
+          }
+          
+          // Enable execution before calling the function
+          const enableExecution = (confirmActionRef as any).enableExecution;
+          if (enableExecution && typeof enableExecution === 'function') {
+            console.log('Enabling action function execution');
+            enableExecution();
+          } else {
+            console.error('enableExecution function not found');
+            setError('Cannot enable action execution. Please try again.');
+            setShowConfirmModal(false);
+            setIsSaving(false);
+            return;
+          }
+          
+          // Close confirmation modal immediately to prevent UI blocking
+          setShowConfirmModal(false);
+          setIsSaving(true);
+          
+          try {
+            console.log('Calling action function from confirmation modal - should execute now');
+            // Call the action function - it will now execute because canExecute is true
+            await action();
+            console.log('Action function completed successfully');
+          } catch (error) {
+            // Error is already handled in action, but ensure we show it
+            console.error('Error in confirmation action:', error);
+            // If action didn't set an error, set a generic one
+            setError('An unexpected error occurred. Please try again.');
+            setIsSaving(false);
+          } finally {
+            // Clean up
+            (confirmActionRef as any).enableExecution = null;
+          }
+        }}
+        message={confirmMessage}
+        title="Confirm Action"
+      />
+    </div>
+  );
+}
+

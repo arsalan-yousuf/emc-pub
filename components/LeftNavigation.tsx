@@ -21,11 +21,14 @@ import {
   Laptop
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { isAdmin, getUserRole, isSuperAdmin } from '@/lib/user-roles';
+import type { UserRole } from '@/lib/user-roles';
 
 interface NavItem {
   label: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
+  adminOnly?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -34,6 +37,7 @@ const navItems: NavItem[] = [
   { label: 'Customer Search', href: '/customers', icon: Search },
   { label: 'Analytics', href: '/analytics', icon: BarChart },
   { label: 'Summary Gen', href: '/summaries', icon: FileText },
+  { label: 'User Profiles', href: '/admin/profiles', icon: User, adminOnly: true },
 ];
 
 interface UserProfile {
@@ -48,6 +52,9 @@ export default function LeftNavigation() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [isUserAdmin, setIsUserAdmin] = useState(false);
+  const [isUserSuperAdmin, setIsUserSuperAdmin] = useState(false);
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
   const { theme, setTheme } = useTheme();
   const pathname = usePathname();
   // const logout = async () => {
@@ -65,7 +72,7 @@ export default function LeftNavigation() {
     setMounted(true);
   }, []);
 
-  // Fetch user data
+  // Fetch user data and check admin status
   useEffect(() => {
     const fetchUser = async () => {
       const supabase = createClient();
@@ -75,7 +82,7 @@ export default function LeftNavigation() {
         // Fetch profile information
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('first_name, last_name, dashboard_id')
+          .select('first_name, last_name, metabase_dashboard_id')
           .eq('id', authUser.id)
           .single();
 
@@ -90,8 +97,18 @@ export default function LeftNavigation() {
           name: fullName,
           first_name: profile?.first_name,
           last_name: profile?.last_name,
-          dashboard_id: profile?.dashboard_id
+          dashboard_id: profile?.metabase_dashboard_id
         });
+
+        // Check if user is admin or super_admin
+        const adminStatus = await isAdmin();
+        setIsUserAdmin(adminStatus);
+        const superAdminStatus = await isSuperAdmin();
+        setIsUserSuperAdmin(superAdminStatus);
+        
+        // Get user role
+        const role = await getUserRole(authUser.id);
+        setUserRole(role);
       }
 
       // Listen for auth changes
@@ -100,7 +117,7 @@ export default function LeftNavigation() {
           // Fetch profile information
           const { data: profile } = await supabase
             .from('profiles')
-            .select('first_name, last_name, dashboard_id')
+            .select('first_name, last_name, metabase_dashboard_id')
             .eq('id', session.user.id)
             .single();
 
@@ -115,10 +132,23 @@ export default function LeftNavigation() {
             name: fullName,
             first_name: profile?.first_name,
             last_name: profile?.last_name,
-            dashboard_id: profile?.dashboard_id
+            dashboard_id: profile?.metabase_dashboard_id
           });
+
+          // Check if user is admin or super_admin
+          const adminStatus = await isAdmin();
+          setIsUserAdmin(adminStatus);
+          const superAdminStatus = await isSuperAdmin();
+          setIsUserSuperAdmin(superAdminStatus);
+          
+          // Get user role
+          const role = await getUserRole(session.user.id);
+          setUserRole(role);
         } else {
           setUser(null);
+          setIsUserAdmin(false);
+          setIsUserSuperAdmin(false);
+          setUserRole(null);
         }
       });
 
@@ -170,6 +200,52 @@ export default function LeftNavigation() {
         {/* Navigation Items */}
         <ul className="nav-list">
           {navItems.map((item) => {
+            // Email Gen is always visible
+            if (item.href === '/emailgen') {
+              const Icon = item.icon;
+              const isActive = pathname === item.href;
+              return (
+                <li key={item.href} className="nav-item">
+                  <Link
+                    href={item.href}
+                    className={`nav-link ${isActive ? 'active' : ''}`}
+                    title={isCollapsed ? item.label : undefined}
+                  >
+                    <Icon className="nav-icon" />
+                    {!isCollapsed && <span className="nav-label">{item.label}</span>}
+                  </Link>
+                </li>
+              );
+            }
+            
+            // Hide admin-only items if user is not admin or super_admin
+            if (item.adminOnly && !isUserAdmin) {
+              return null;
+            }
+            
+            // Admins and super_admins can view all screens
+            if (isUserAdmin || isUserSuperAdmin) {
+              const Icon = item.icon;
+              const isActive = pathname === item.href;
+              return (
+                <li key={item.href} className="nav-item">
+                  <Link
+                    href={item.href}
+                    className={`nav-link ${isActive ? 'active' : ''}`}
+                    title={isCollapsed ? item.label : undefined}
+                  >
+                    <Icon className="nav-icon" />
+                    {!isCollapsed && <span className="nav-label">{item.label}</span>}
+                  </Link>
+                </li>
+              );
+            }
+            
+            // For non-admins: Hide all other items if user has no role
+            if (!userRole) {
+              return null;
+            }
+
             const Icon = item.icon;
             const isActive = pathname === item.href;
             

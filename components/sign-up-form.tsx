@@ -23,7 +23,7 @@ export function SignUpForm({
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [dashboardId, setDashboardId] = useState("");
+  // const [dashboardId, setDashboardId] = useState("");
   const [password, setPassword] = useState("");
   const [repeatPassword, setRepeatPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +59,8 @@ export function SignUpForm({
           data: {
             first_name: firstName,
             last_name: lastName,
-            dashboard_id: dashboardId,
+            email: email,
+            // dashboard_id: dashboardId,
           },
         },
       });
@@ -109,7 +110,7 @@ export function SignUpForm({
                   onChange={(e) => setLastName(e.target.value)}
                 />
               </div>
-              <div className="grid gap-2">
+              {/* <div className="grid gap-2">
                   <Label htmlFor="dashboardId">Dashboard ID</Label>
                 <Input
                     id="dashboardId"
@@ -122,20 +123,20 @@ export function SignUpForm({
                   <p className="text-xs text-muted-foreground invisible">
                     Placeholder for alignment
                   </p>
-              </div>
-              <div className="grid gap-2">
+              </div> */}
+              <div className="grid gap-2 md:col-span-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
                   type="email"
-                    placeholder="d.jeworski@emc-direct.de"
+                  placeholder="d.jeworski@emc-direct.de"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
-                  <p className="text-xs text-muted-foreground">
-                    Only @emc-direct.de email addresses are allowed
-                  </p>
+                <p className="text-xs text-muted-foreground">
+                  Only @emc-direct.de email addresses are allowed
+                </p>
               </div>
               <div className="grid gap-2">
                   <Label htmlFor="password">Password</Label>

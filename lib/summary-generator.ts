@@ -21,6 +21,12 @@ function buildSummaryPrompt(transcript: string, language: string): string {
   if (isGerman) {
     return `You are a professional sales operations assistant for EMC.
 
+IMPORTANT CONTEXT ABOUT THE INPUT:
+- The input is NOT a verbatim call transcript.
+- The input IS a spoken voice note recorded by the sales agent AFTER the call.
+- The voice note describes what was discussed with the customer.
+- You MUST extract and structure the information based on the agent’s summary.
+
 LANGUAGE OUTPUT RULE:
 - The entire output MUST be written ONLY in German.
 - Do NOT use any English words under ANY circumstances.
@@ -70,7 +76,7 @@ STRICT STRUCTURE ENFORCEMENT:
 - If any information is missing, you MUST write exactly: "Nicht erwähnt".
 - You MUST preserve all punctuation, formatting, and bullet points exactly.
 
-TRANSKRIPT ZUR ANALYSE:
+SPRACHNOTIZ ZUR ANALYSE:
 ${transcript}
 
 FINAL OUTPUT RULES:
@@ -82,6 +88,12 @@ FINAL OUTPUT RULES:
 - NO structure changes.`;
   } else {
     return `You are a professional sales operations assistant for EMC.
+
+IMPORTANT CONTEXT ABOUT THE INPUT:
+- The input is NOT a verbatim call transcript.
+- The input IS a spoken voice note recorded by the sales agent AFTER the call.
+- The voice note describes what was discussed with the customer.
+- You MUST extract and structure the information based on the agent’s summary.
 
 LANGUAGE OUTPUT RULE:
 - The entire output MUST be written ONLY in English.
@@ -133,7 +145,7 @@ STRUCTURE (DO NOT MODIFY ANY LINE BELOW):
 - Internal to-dos
 - Next contact (when + for what)
 
-TRANSCRIPT TO ANALYZE:
+VOICE NOTE TO ANALYZE:
 ${transcript}
 
 FINAL OUTPUT RULES:

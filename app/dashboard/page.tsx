@@ -20,19 +20,19 @@ async function DashboardContent() {
     redirect("/auth/login");
   }
 
-  // Fetch user's profile to get dashboard_id
+  // Fetch user's profile to get metabase_dashboard_id
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('dashboard_id')
+    .select('metabase_dashboard_id')
     .eq('id', user.id)
     .single();
 
-  if (profileError || !profile?.dashboard_id) {
+  if (profileError || !profile?.metabase_dashboard_id) {
   return (
       <div className="w-full flex items-center justify-center p-8">
         <div className="text-center">
           <p className="text-lg text-muted-foreground mb-2">
-            Dashboard ID not found
+            Dashboard not configured
           </p>
           <p className="text-sm text-muted-foreground">
             Please contact your administrator to set up your dashboard.
@@ -43,12 +43,12 @@ async function DashboardContent() {
   }
 
   // Generate initial iframe URL using the library function
-  const iframeUrl = generateMetabaseIframeUrl(profile.dashboard_id);
+  const iframeUrl = generateMetabaseIframeUrl(profile.metabase_dashboard_id);
 
   return (
     <DashboardIframe 
       iframeUrl={iframeUrl} 
-      dashboardId={profile.dashboard_id}
+      dashboardId={profile.metabase_dashboard_id}
       refreshDashboardUrl={refreshDashboardUrl}
     />
   );
