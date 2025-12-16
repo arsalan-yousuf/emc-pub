@@ -10,10 +10,15 @@ import DeleteConfirmationModal from './summaries/DeleteConfirmationModal';
 import { CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react';
 import { SummaryWithUser } from '@/lib/summaries-db';
 import { deleteSummary } from '@/lib/summaries-db';
-import { isAdmin, getUserRole } from '@/lib/user-roles';
+import { type UserRole } from '@/lib/user-roles';
+import { getUserRoleServer } from '@/lib/user-roles-server';
 import { createClient } from '@/lib/supabase/client';
 
-export default function SummaryContainer() {
+interface SummaryContainerProps {
+  initialRole?: UserRole | null;
+}
+
+export default function SummaryContainer({ initialRole = null }: SummaryContainerProps) {
   const [activeTab, setActiveTab] = useState('generator');
   const [isMounted, setIsMounted] = useState(false);
   const [historyRefreshTrigger, setHistoryRefreshTrigger] = useState(0);
@@ -24,25 +29,55 @@ export default function SummaryContainer() {
   const [summaryToDelete, setSummaryToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showViewSummaries, setShowViewSummaries] = useState(false);
+  
+  // Initialize with the role passed from parent (server-side fetch)
+  useEffect(() => {
+    if (initialRole) {
+      const hasAccess = initialRole === 'super_admin' || initialRole === 'admin' || initialRole === 'sales_support';
+      setShowViewSummaries(hasAccess);
+    }
+  }, [initialRole]);
 
   useEffect(() => {
     setIsMounted(true);
     
-    // Check if user can view summaries tab
+    // Refetch role on client-side to update UI if role changed
+    // This ensures UI stays in sync even if role was assigned/removed after page load
     const checkViewAccess = async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const role = await getUserRole(user.id);
+      try {
+        // Use server action instead of direct client call
+        const role = await getUserRoleServer();
+
         // Show tab for super_admin, admin, or sales_support
-        if (role === 'super_admin' || role === 'admin' || role === 'sales_support') {
-          setShowViewSummaries(true);
+        const hasAccess = role === 'super_admin' || role === 'admin' || role === 'sales_support';
+        setShowViewSummaries(hasAccess);
+      } catch (error) {
+        console.error('Error checking view access:', error);
+        // Don't override if we have initialRole
+        if (!initialRole) {
+          setShowViewSummaries(false);
         }
       }
     };
     
-    checkViewAccess();
-  }, []);
+    // Refetch after a short delay to update if role changed
+    const timeoutId = setTimeout(() => {
+      checkViewAccess();
+    }, 500);
+
+    // Listen to auth state changes to re-check access when user logs in/out
+    const supabase = createClient();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+        checkViewAccess();
+      }
+    });
+
+    return () => {
+      clearTimeout(timeoutId);
+      subscription.unsubscribe();
+    };
+  }, [initialRole]);
 
   const showToast = (type: 'success' | 'error' | 'warning' | 'info', message: string, duration: number = 3000) => {
     const id = Date.now().toString();

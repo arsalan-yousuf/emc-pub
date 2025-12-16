@@ -43,12 +43,12 @@ export function SignUpForm({
     }
 
     // Validate company email domain
-    const allowedDomain = "emc-direct.de";
-    if (!email.toLowerCase().endsWith(`@${allowedDomain}`)) {
-      setError(`Only ${allowedDomain} email addresses are allowed`);
-      setIsLoading(false);
-      return;
-    }
+    // const allowedDomain = "emc-direct.de";
+    // if (!email.toLowerCase().endsWith(`@${allowedDomain}`)) {
+    //   setError(`Only ${allowedDomain} email addresses are allowed`);
+    //   setIsLoading(false);
+    //   return;
+    // }
 
     try {
       const { data, error } = await supabase.auth.signUp({

@@ -22,3 +22,5 @@ CREATE POLICY "user_roles_select_own" ON public.user_roles
 -- Note: INSERT, UPDATE, DELETE are handled by the grant_role and revoke_role functions
 -- which are SECURITY DEFINER and have their own authorization checks
 
+
+

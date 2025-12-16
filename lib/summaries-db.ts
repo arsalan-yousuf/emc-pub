@@ -147,7 +147,8 @@ export async function fetchSummaries(): Promise<{ success: boolean; data?: Summa
   }
 }
 
-// Fetch summaries for "View Summaries" tab with hierarchical access
+// Fetch summaries for "View Summaries" tab
+// RLS policies handle the role-based filtering automatically
 // Excludes current user's own summaries (those are in History tab)
 export async function fetchAllSummariesForView(): Promise<{ success: boolean; data?: SummaryWithUser[]; error?: string }> {
   try {
@@ -160,20 +161,14 @@ export async function fetchAllSummariesForView(): Promise<{ success: boolean; da
       return { success: false, error: 'User not authenticated' };
     }
 
-    // Get current user's role - use server client since this is a server action
-    const currentUserRole = await getUserRole(user.id);
-    
-    if (!currentUserRole || (currentUserRole !== 'super_admin' && currentUserRole !== 'admin' && currentUserRole !== 'sales_support')) {
-      return { success: false, error: 'Access denied' };
-    }
-
     // Get all summaries (excluding current user's own summaries)
+    // RLS policies will automatically filter based on user's role
     const { data: summariesData, error: summariesError } = await supabase
       .from('sales_summaries')
       .select('*')
       .neq('user_id', user.id) // Exclude current user's own summaries
       .order('created_at', { ascending: false });
-
+    
     if (summariesError) {
       console.error('Error fetching summaries:', summariesError);
       return { success: false, error: summariesError.message };
@@ -183,15 +178,15 @@ export async function fetchAllSummariesForView(): Promise<{ success: boolean; da
       return { success: true, data: [] };
     }
 
-    // Get unique user IDs from summaries
+    // Get unique user IDs from summaries (RLS has already filtered them)
     const uniqueUserIds = [...new Set(summariesData.map((s: any) => s.user_id))];
-
-    // Fetch profiles for all unique user IDs
+    console.log('uniqueUserIds', uniqueUserIds);
+    // Fetch profiles for the user IDs (RLS will filter profiles based on access)
     const { data: profilesData, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, first_name, last_name, email')
-      .in('id', uniqueUserIds);
-
+      .select('id, first_name, last_name, email');
+      // .in('id', uniqueUserIds);
+    console.log('profilesData', profilesData);
     if (profilesError) {
       console.error('Error fetching profiles:', profilesError);
       // Continue without profile data if profiles can't be fetched
@@ -205,38 +200,8 @@ export async function fetchAllSummariesForView(): Promise<{ success: boolean; da
       });
     }
 
-    // Get all user roles to filter hierarchically
-    const { data: allUserRoles } = await supabase
-      .from('user_roles')
-      .select('user_id, role');
-
-    const userRoleMap = new Map<string, string>();
-    if (allUserRoles) {
-      allUserRoles.forEach((ur: any) => {
-        userRoleMap.set(ur.user_id, ur.role);
-      });
-    }
-
-    // Filter summaries based on hierarchical access
-    let filteredSummaries = summariesData.filter((item: any) => {
-      const summaryOwnerRole = userRoleMap.get(item.user_id);
-      
-      if (currentUserRole === 'super_admin') {
-        // Super admins can see all summaries (except own, already filtered)
-        return true;
-      } else if (currentUserRole === 'admin') {
-        // Admins can see all except super_admins
-        return summaryOwnerRole !== 'super_admin';
-      } else if (currentUserRole === 'sales_support') {
-        // Sales-support can see sales and sales_support only
-        return summaryOwnerRole === 'sales' || summaryOwnerRole === 'sales_support';
-      }
-      
-      return false;
-    });
-
     // Transform data with profile information
-    const summaries: SummaryWithUser[] = filteredSummaries.map((item: any) => {
+    const summaries: SummaryWithUser[] = summariesData.map((item: any) => {
       const profile = profileMap.get(item.user_id);
       const userName = profile?.first_name && profile?.last_name
         ? `${profile.first_name} ${profile.last_name}`
