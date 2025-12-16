@@ -209,31 +209,21 @@ CREATE TRIGGER on_auth_user_created
 -- Enable RLS
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
--- SELECT policy (view)
+-- Drop the existing SELECT policy (if named exactly as before)
 DROP POLICY IF EXISTS "profiles_select_super_admin_admin_sales_support" ON public.profiles;
+
+-- Create new SELECT policy:
 CREATE POLICY "profiles_select_super_admin_admin_sales_support" ON public.profiles
-  FOR SELECT TO authenticated
+  FOR SELECT
+  TO authenticated
   USING (
-    -- super_admin: full access
-    public.is_user_in_role('super_admin')
-    -- admin can view profiles of admin, sales & sales_support
-    OR (
-      public.is_user_in_role('admin')
-      AND NOT public.user_has_role(id, 'super_admin')
-    )
-    -- sales_support & sales can view profiles of sales or sales_support
-    OR (
-      (
-        public.is_user_in_role('sales_support') 
-        OR public.is_user_in_role('sales')
-      )
-      AND (
-        public.user_has_role(id, 'sales')
-        OR public.user_has_role(id, 'sales_support')
-      )
-    )
-    -- sales can view their own summaries
-    OR ( id = auth.uid() )
+    -- admin, super_admin or sales_support can view all profiles
+    public.is_user_in_role('admin')
+    OR public.is_user_in_role('super_admin')
+    OR public.is_user_in_role('sales_support')
+
+    -- other authenticated users can view only their own profile
+    OR (id = auth.uid())
   );
 
 -- UPDATE policy (edit)
@@ -283,6 +273,39 @@ CREATE POLICY "profiles_delete_admins" ON public.profiles
     OR (public.is_user_in_role('admin') AND (public.user_has_role(id, 'sales') OR public.user_has_role(id, 'sales_support')))
   );
 
+CREATE OR REPLACE FUNCTION public.get_profiles_with_role()
+RETURNS TABLE (
+  id uuid,
+  first_name text,
+  last_name text,
+  email text,
+  metabase_dashboard_id integer,
+  created_at timestamptz,
+  updated_at timestamptz,
+  role text  -- enum value as text, NULL if none
+)
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT
+    p.id,
+    p.first_name,
+    p.last_name,
+    p.email,
+    p.metabase_dashboard_id,
+    p.created_at,
+    p.updated_at,
+    ur.role::text AS role
+  FROM public.profiles p
+  LEFT JOIN LATERAL (
+    SELECT role
+    FROM public.user_roles ur
+    WHERE ur.user_id = p.id
+    ORDER BY ur.granted_at DESC NULLS LAST
+    LIMIT 1
+  ) ur ON true
+  ORDER BY p.created_at DESC, p.id;
+$$;
 
 CREATE TABLE sales_summaries (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,

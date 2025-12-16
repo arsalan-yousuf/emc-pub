@@ -279,12 +279,15 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
               paddingLeft: '20px',
               listStyleType: 'disc'
             }}>
-              <li style={{ marginBottom: '8px' }}>Mention the customer's main requirements and needs</li>
-              <li style={{ marginBottom: '8px' }}>Include key discussion points and decisions made</li>
-              <li style={{ marginBottom: '8px' }}>Note any action items or next steps</li>
-              <li style={{ marginBottom: '8px' }}>Describe the customer's current situation or challenges</li>
-              <li style={{ marginBottom: '8px' }}>Mention any products, services, or solutions discussed</li>
-              <li style={{ marginBottom: '0' }}>Include any important dates, deadlines, or follow-up information</li>
+              <li style={{ marginBottom: '8px' }}>Direkt nach dem Gespräch erfassen (spätestens nach 10–15 Min.), sonst erst roh Stichpunkte notieren.</li>
+              <li style={{ marginBottom: '8px' }}>Nur Fakten, keine Vermutungen: Wenn etwas fehlt → „offen / nicht erwähnt“ statt raten.</li>
+              <li style={{ marginBottom: '8px' }}>Kundenbedarf klar formulieren: „Kunde braucht X, weil Y.“</li>
+              <li style={{ marginBottom: '8px' }}>Situation/Problem konkret: Ursache + Auswirkung (nicht nur „läuft schlecht“).</li>
+              <li style={{ marginBottom: '8px' }}>Entscheidungen markieren: „Entschieden:“ / „Nicht entschieden:</li>
+              <li style={{ marginBottom: '8px' }}>To-dos immer komplett: Owner + Termin (oder „Termin offen + Trigger“).</li>
+              <li style={{ marginBottom: '8px' }}>Produkte/Lösungen nur nennen, wenn wirklich besprochen (mit Bezug wofür).</li>
+              <li style={{ marginBottom: '8px' }}>Daten immer absolut (TT.MM.JJJJ) + nächster Kontakt (Datum + Zweck).</li>
+              <li style={{ marginBottom: '0' }}>30-Sekunden Check: Sind Bedarf, Entscheidung, To-dos, Deadline drin? Alles Unklare als „offen“ markiert?</li>
             </ul>
           </div>
         </div>

@@ -200,8 +200,12 @@ export default function LeftNavigation() {
         {/* Navigation Items */}
         <ul className="nav-list">
           {navItems.map((item) => {
-            // Email Gen is always visible
-            if (item.href === '/emailgen') {
+            // Routes accessible to users with no role
+            const publicRoutes = ['/emailgen', '/customers', '/analytics'];
+            const isPublicRoute = publicRoutes.includes(item.href);
+            
+            // Email Gen, Customer Search, and Analytics are always visible
+            if (isPublicRoute) {
               const Icon = item.icon;
               const isActive = pathname === item.href;
               return (

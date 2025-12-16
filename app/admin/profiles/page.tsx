@@ -2,24 +2,12 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { isAdmin, isSuperAdmin, getUserRole, grantRoleToUser, revokeRoleFromUser, type UserRole } from '@/lib/user-roles';
+import { isAdmin, isSuperAdmin, grantRoleToUser, revokeRoleFromUser, type UserRole } from '@/lib/user-roles';
+import { fetchProfiles, type ProfileWithRole } from '@/lib/profiles-server';
 import { useRouter } from 'next/navigation';
 import { Edit2, Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, User, Shield } from 'lucide-react';
 import EditProfileModal from '@/components/admin/EditProfileModal';
 
-interface Profile {
-  id: string;
-  first_name: string | null;
-  last_name: string | null;
-  email: string | null;
-  metabase_dashboard_id: number | null;
-  created_at: string;
-  updated_at: string;
-}
-
-interface ProfileWithRole extends Profile {
-  role: UserRole | null;
-}
 
 type SortField = 'first_name' | 'last_name' | 'email' | 'created_at';
 type SortDirection = 'asc' | 'desc';
@@ -43,9 +31,9 @@ export default function AdminProfilesPage() {
 
   const itemsPerPage = 10;
 
-  // Check authorization
+  // Check authorization and load profiles
   useEffect(() => {
-    const checkAuth = async () => {
+    const checkAuthAndLoad = async () => {
       const admin = await isAdmin();
       if (!admin) {
         router.push('/dashboard');
@@ -55,61 +43,36 @@ export default function AdminProfilesPage() {
       const superAdmin = await isSuperAdmin();
       setCurrentUserIsSuperAdmin(superAdmin);
       
-      // Get current user ID
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setCurrentUserId(user.id);
-      }
-      
       loadProfiles();
     };
-    checkAuth();
+    checkAuthAndLoad();
   }, [router]);
 
-  // Load profiles
+  // Load profiles using server action
   const loadProfiles = async () => {
     try {
       setIsLoading(true);
       setError(null);
-      const supabase = createClient();
       
-      // Fetch profiles (RLS will handle access control)
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const result = await fetchProfiles();
 
-      if (profilesError) {
-        console.error('Profiles fetch error:', profilesError);
-        throw new Error(profilesError.message || 'Failed to load profiles. Please check your permissions.');
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to load profiles');
       }
 
-      if (!profilesData) {
+      if (result.data) {
+        setProfiles(result.data);
+      } else {
         setProfiles([]);
-        setIsLoading(false);
-        return;
       }
-      // Fetch roles for each profile
-      const profilesWithRoles: ProfileWithRole[] = await Promise.all(
-        profilesData.map(async (profile) => {
-          try {
-            const role = await getUserRole(profile.id);
-            return {
-              ...profile,
-              role
-            };
-          } catch (err) {
-            console.error(`Error fetching role for profile ${profile.id}:`, err);
-            return {
-              ...profile,
-              role: null
-            };
-          }
-        })
-      );
 
-      setProfiles(profilesWithRoles);
+      // Set current user ID and super admin status from server response
+      if (result.currentUserId) {
+        setCurrentUserId(result.currentUserId);
+      }
+      if (result.isSuperAdmin !== undefined) {
+        setCurrentUserIsSuperAdmin(result.isSuperAdmin);
+      }
     } catch (err) {
       console.error('Error loading profiles:', err);
       const errorMessage = err instanceof Error 
