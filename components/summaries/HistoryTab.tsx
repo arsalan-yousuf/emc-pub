@@ -107,14 +107,14 @@ function HistoryTab({ showToast, refreshTrigger = 0, onOpenSummaryModal, onReque
         {(isLoading || isDeleting) ? (
           <div className="history-loading">
             <div className="loading-spinner"></div>
-            <p>{isDeleting ? 'Deleting summary...' : 'Loading summaries...'}</p>
+            <p>{isDeleting ? 'Zusammenfassung wird gelöscht...' : 'Zusammenfassungen werden geladen...'}</p>
           </div>
         ) : (
           <>
             <div className="history-search">
               <input 
                 type="text" 
-                placeholder="Search by customer, transcript, or summary..."
+                placeholder="Nach Kunde, Transkript oder Zusammenfassung suchen..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ 
@@ -136,8 +136,8 @@ function HistoryTab({ showToast, refreshTrigger = 0, onOpenSummaryModal, onReque
                     <div className="empty-state-icon">
                       <Inbox className="h-12 w-12 text-gray-400" />
                     </div>
-                    <p>No summaries yet</p>
-                    <small>Your generated summaries will appear here</small>
+                    <p>Noch keine Zusammenfassungen</p>
+                    <small>Ihre generierten Zusammenfassungen werden hier angezeigt</small>
                   </div>
                 ) : (
                   <div className="history-items">
@@ -154,7 +154,7 @@ function HistoryTab({ showToast, refreshTrigger = 0, onOpenSummaryModal, onReque
                             {formatDate(item.created_at || '')}
                             {item.user_name && (
                               <span style={{ marginLeft: '10px', fontSize: '0.85em', color: 'var(--text-muted)' }}>
-                                by {item.user_name}
+                                von {item.user_name}
                               </span>
                             )}
                           </div>
@@ -184,7 +184,7 @@ function HistoryTab({ showToast, refreshTrigger = 0, onOpenSummaryModal, onReque
                         <div className="history-preview">{getPreviewText(item.summary, 150)}</div>
                         <div className="history-item-settings">
                           <small>
-                            {item.language} • {item.customer_email || item.customer_phone || 'No contact'}
+                            {item.language} • {item.customer_email || item.customer_phone || 'Kein Kontakt'}
                           </small>
                         </div>
                       </div>

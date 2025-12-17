@@ -14,7 +14,6 @@ export default function DashboardIframe({ iframeKey, iframeUrl, dashboardId, ref
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   // const [currentUrl, setCurrentUrl] = useState<string | null>(null);
-console.log("Rafaqat", iframeKey, "iframeUrl", iframeUrl);
   const handleRefresh = async () => {
     setIsRefreshing(true);
     
@@ -42,13 +41,13 @@ console.log("Rafaqat", iframeKey, "iframeUrl", iframeUrl);
           onClick={handleRefresh}
           disabled={isRefreshing}
           className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-3xl shadow-md hover:shadow-lg transition-all duration-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Refresh Dashboard"
+          title="Dashboard aktualisieren"
           type="button"
         >
           <RefreshCw 
             className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} 
           />
-          <span className="text-sm font-medium">Refresh</span>
+          <span className="text-sm font-medium">Aktualisieren</span>
         </button>
       </div>
 

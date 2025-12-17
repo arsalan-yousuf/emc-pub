@@ -105,12 +105,12 @@ function ViewSummariesTab({ showToast, refreshTrigger = 0, onOpenSummaryModal, o
     try {
       await navigator.clipboard.writeText(text);
       const message = type === 'summary' 
-        ? 'Summary copied to clipboard!' 
-        : 'Transcript copied to clipboard!';
+        ? 'Zusammenfassung in die Zwischenablage kopiert!' 
+        : 'Transkript in die Zwischenablage kopiert!';
       showToast?.('success', message);
     } catch (error) {
       console.error('Failed to copy to clipboard:', error);
-      showToast?.('error', 'Failed to copy to clipboard');
+      showToast?.('error', 'In die Zwischenablage kopieren fehlgeschlagen');
     }
   };
 
@@ -135,14 +135,14 @@ function ViewSummariesTab({ showToast, refreshTrigger = 0, onOpenSummaryModal, o
         {(isLoading || isDeleting) ? (
           <div className="history-loading">
             <div className="loading-spinner"></div>
-            <p>{isDeleting ? 'Deleting summary...' : 'Loading summaries...'}</p>
+            <p>{isDeleting ? 'Zusammenfassung wird gelöscht...' : 'Zusammenfassungen werden geladen...'}</p>
           </div>
         ) : (
           <>
             <div className="history-search">
               <input 
                 type="text" 
-                placeholder="Search by customer, user, transcript, or summary..."
+                placeholder="Nach Kunde, Benutzer, Transkript oder Zusammenfassung suchen..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ 
@@ -164,8 +164,8 @@ function ViewSummariesTab({ showToast, refreshTrigger = 0, onOpenSummaryModal, o
                     <div className="empty-state-icon">
                       <Inbox className="h-12 w-12 text-gray-400" />
                     </div>
-                    <p>No summaries found</p>
-                    <small>Summaries from other users will appear here</small>
+                    <p>Keine Zusammenfassungen gefunden</p>
+                    <small>Zusammenfassungen von anderen Benutzern werden hier angezeigt</small>
                   </div>
                 ) : (
                   <div className="history-items">
@@ -192,7 +192,7 @@ function ViewSummariesTab({ showToast, refreshTrigger = 0, onOpenSummaryModal, o
                               </div>
                             )}
                             <div style={{ fontSize: '0.8em', color: 'var(--text-muted)', marginTop: '4px' }}>
-                              {group.summaries.length} {group.summaries.length === 1 ? 'summary' : 'summaries'}
+                              {group.summaries.length} {group.summaries.length === 1 ? 'Zusammenfassung' : 'Zusammenfassungen'}
                             </div>
                           </div>
                         </div>

@@ -59,12 +59,12 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
 
   const handleGenerateSummary = async () => {
     if (!transcript.trim()) {
-      showToast?.('error', 'Please provide a transcript');
+      showToast?.('error', 'Bitte geben Sie ein Transkript an');
       return;
     }
 
     if (!customerName.trim()) {
-      showToast?.('error', 'Please provide customer name');
+      showToast?.('error', 'Bitte geben Sie den Kundennamen an');
       return;
     }
 
@@ -81,13 +81,13 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
         setSummary(result.content);
         setEditedSummary(result.content);
         setIsEditingSummary(false);
-        showToast?.('success', 'Summary generated successfully!');
+        showToast?.('success', 'Zusammenfassung erfolgreich generiert!');
       } else {
-        showToast?.('error', result.error || 'Failed to generate summary');
+        showToast?.('error', result.error || 'Zusammenfassung konnte nicht generiert werden');
       }
     } catch (error) {
       console.error('Error generating summary:', error);
-      showToast?.('error', 'An error occurred while generating the summary');
+      showToast?.('error', 'Beim Generieren der Zusammenfassung ist ein Fehler aufgetreten');
     } finally {
       setIsGenerating(false);
     }
@@ -106,19 +106,19 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
   const handleSaveEdit = () => {
     setSummary(editedSummary);
     setIsEditingSummary(false);
-    showToast?.('success', 'Summary updated!');
+    showToast?.('success', 'Zusammenfassung aktualisiert!');
   };
 
   const handleSaveSummary = async () => {
     const summaryToSave = isEditingSummary ? editedSummary : summary;
     
     if (!summaryToSave.trim()) {
-      showToast?.('error', 'No summary to save');
+      showToast?.('error', 'Keine Zusammenfassung zum Speichern');
       return;
     }
 
     if (!userId) {
-      showToast?.('error', 'User not authenticated');
+      showToast?.('error', 'Benutzer nicht authentifiziert');
       return;
     }
 
@@ -136,7 +136,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
       });
 
       if (result.success) {
-        showToast?.('success', 'Summary saved successfully!');
+        showToast?.('success', 'Zusammenfassung erfolgreich gespeichert!');
         // Reset form
         setTranscript('');
         setSummary('');
@@ -149,11 +149,11 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
         // Trigger history refresh
         onSummarySaved?.();
       } else {
-        showToast?.('error', result.error || 'Failed to save summary');
+        showToast?.('error', result.error || 'Zusammenfassung konnte nicht gespeichert werden');
       }
     } catch (error) {
       console.error('Error saving summary:', error);
-      showToast?.('error', 'An error occurred while saving the summary');
+      showToast?.('error', 'Beim Speichern der Zusammenfassung ist ein Fehler aufgetreten');
     } finally {
       setIsSaving(false);
     }
@@ -165,7 +165,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
         {/* Language Selection */}
         <div className="input-section">
           <label htmlFor="summaryLanguage" style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>
-            Recording Language:
+            Aufnahmesprache:
           </label>
           <select
             id="summaryLanguage"
@@ -183,14 +183,14 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
             }}
             disabled={isRecording}
           >
-            <option value="german">German (Deutsch)</option>
-            <option value="english">English</option>
+            <option value="german">Deutsch</option>
+            <option value="english">Englisch</option>
           </select>
         </div>
 
         {/* Customer Information */}
         <div className="input-section">
-          <h3 style={{ marginBottom: '15px', fontWeight: '600' }}>Customer Information</h3>
+          <h3 style={{ marginBottom: '15px', fontWeight: '600' }}>Kundeninformationen</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '15px' }}>
             <div>
               <label htmlFor="customerName" style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
@@ -238,7 +238,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
             </div>
             <div>
               <label htmlFor="customerEmail" style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
-                Email
+                E-Mail
               </label>
               <input
                 id="customerEmail"
@@ -259,7 +259,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
             </div>
             <div>
               <label htmlFor="customerPhone" style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
-                Phone
+                Telefon
               </label>
               <input
                 id="customerPhone"
@@ -284,7 +284,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
         {/* Recording Guidelines */}
         <div className="input-section">
           <label style={{ display: 'block', marginBottom: '12px', fontWeight: '600' }}>
-            Recording Guidelines:
+            Aufnahmerichtlinien:
           </label>
           <div
             style={{
@@ -319,7 +319,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
 
         {/* Voice Recorder */}
         <div className="input-section" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <h3 style={{ marginBottom: '20px', fontWeight: '600' }}>Record Voice Note</h3>
+          <h3 style={{ marginBottom: '20px', fontWeight: '600' }}>Sprachnotiz aufnehmen</h3>
           <VoiceRecorder
             onTranscription={handleTranscription}
             language={language}
@@ -332,14 +332,14 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
         {transcript && (
           <div className="input-section">
             <label htmlFor="transcript" style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>
-              Transcript (Editable):
+              Transkript (bearbeitbar):
             </label>
             <textarea
               id="transcript"
               value={transcript}
               onChange={(e) => setTranscript(e.target.value)}
               rows={8}
-              placeholder="Transcript will appear here after recording..."
+              placeholder="Transkript erscheint hier nach der Aufnahme..."
               style={{
                 width: '100%',
                 padding: '12px',
@@ -378,10 +378,10 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
               {isGenerating ? (
                 <>
                   <span className="loading" style={{ marginRight: '8px' }}></span>
-                  Generating Summary...
+                  Zusammenfassung wird generiert...
                 </>
               ) : (
-                'Generate Summary'
+                'Zusammenfassung generieren'
               )}
             </button>
           </div>
@@ -393,7 +393,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
             <div className="response-box">
               <div className="response-header">
                 <div>
-                  <div className="response-title">Generated Summary</div>
+                  <div className="response-title">Generierte Zusammenfassung</div>
                 </div>
                 <div>
                   {!isEditingSummary ? (
@@ -402,10 +402,10 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
                         className="copy-button"
                         onClick={() => {
                           navigator.clipboard.writeText(summary);
-                          showToast?.('success', 'Summary copied to clipboard!');
+                          showToast?.('success', 'Zusammenfassung in die Zwischenablage kopiert!');
                         }}
                       >
-                        Copy
+                        Kopieren
                       </button>
                       <button
                         onClick={handleEditSummary}
@@ -424,7 +424,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
                         }}
                       >
                         <Edit2 style={{ width: '14px', height: '14px' }} />
-                        Edit
+                        Bearbeiten
                       </button>
                       <button
                         onClick={handleSaveSummary}
@@ -441,7 +441,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
                           opacity: isSaving ? 0.6 : 1
                         }}
                       >
-                        {isSaving ? 'Saving...' : 'Save Summary'}
+                        {isSaving ? 'Wird gespeichert...' : 'Zusammenfassung speichern'}
                       </button>
                     </>
                   ) : (
@@ -463,7 +463,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
                         }}
                       >
                         <Save style={{ width: '14px', height: '14px' }} />
-                        Save Changes
+                        Änderungen speichern
                       </button>
                       <button
                         onClick={handleCancelEdit}
@@ -482,7 +482,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
                         }}
                       >
                         <X style={{ width: '14px', height: '14px' }} />
-                        Cancel
+                        Abbrechen
                       </button>
                     </>
                   )}

@@ -64,7 +64,7 @@ export default function AdminProfilesPage() {
       const result = await fetchProfiles();
 
       if (!result.success) {
-        throw new Error(result.error || 'Failed to load profiles');
+        throw new Error(result.error || 'Profile konnten nicht geladen werden');
       }
 
       if (result.data) {
@@ -86,7 +86,7 @@ export default function AdminProfilesPage() {
         ? err.message 
         : typeof err === 'object' && err !== null && 'message' in err
         ? String(err.message)
-        : 'Failed to load profiles. Please check your permissions and ensure RLS policies are configured correctly.';
+        : 'Profile konnten nicht geladen werden. Bitte überprüfen Sie Ihre Berechtigungen und stellen Sie sicher, dass RLS-Richtlinien korrekt konfiguriert sind.';
       setError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -193,7 +193,7 @@ export default function AdminProfilesPage() {
   // Handle edit
   const handleEdit = (profile: ProfileWithRole) => {
     if (!canEditProfile(profile)) {
-      setError('You do not have permission to edit this profile. Only super admins can edit admin and super admin profiles.');
+      setError('Sie haben keine Berechtigung, dieses Profil zu bearbeiten. Nur Super-Administratoren können Admin- und Super-Admin-Profile bearbeiten.');
       setTimeout(() => setError(null), 5000);
       return;
     }
@@ -205,13 +205,13 @@ export default function AdminProfilesPage() {
     if (!profile) return;
 
     if (!currentUserIsSuperAdmin) {
-      setError('Only super admins can delete user accounts.');
+      setError('Nur Super-Administratoren können Benutzerkonten löschen.');
       setTimeout(() => setError(null), 4000);
       return;
     }
 
     if (currentUserId && profile.id === currentUserId) {
-      setError('You cannot delete your own account.');
+      setError('Sie können Ihr eigenes Konto nicht löschen.');
       setTimeout(() => setError(null), 4000);
       return;
     }
@@ -222,14 +222,14 @@ export default function AdminProfilesPage() {
     try {
       const result = await deleteUserAccount(profile.id);
       if (!result.success) {
-        throw new Error(result.error || 'Failed to delete user');
+        throw new Error(result.error || 'Benutzer konnte nicht gelöscht werden');
       }
-      setSuccess('User deleted successfully');
+      setSuccess('Benutzer erfolgreich gelöscht');
       await loadProfiles();
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
       console.error('Error deleting user:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete user';
+      const errorMessage = err instanceof Error ? err.message : 'Benutzer konnte nicht gelöscht werden';
       setError(errorMessage);
     } finally {
       setDeletingUserId(null);
@@ -260,7 +260,7 @@ export default function AdminProfilesPage() {
 
     // Double-check permissions before saving
     if (!canEditProfile(editingProfile)) {
-      setError('You do not have permission to edit this profile. Only super admins can edit admin and super admin profiles.');
+      setError('Sie haben keine Berechtigung, dieses Profil zu bearbeiten. Nur Super-Administratoren können Admin- und Super-Admin-Profile bearbeiten.');
       setEditingProfile(null);
       return;
     }
@@ -268,7 +268,7 @@ export default function AdminProfilesPage() {
     // Prevent admins from assigning admin or super_admin roles to other users
     const isEditingOwnProfile = currentUserId && editingProfile.id === currentUserId;
     if (!currentUserIsSuperAdmin && !isEditingOwnProfile && (updatedData.role === 'admin' || updatedData.role === 'super_admin')) {
-      setError('You do not have permission to assign admin or super admin roles.');
+      setError('Sie haben keine Berechtigung, Admin- oder Super-Admin-Rollen zuzuweisen.');
       setEditingProfile(null);
       return;
     }
@@ -277,7 +277,7 @@ export default function AdminProfilesPage() {
     if (!currentUserIsSuperAdmin && isEditingOwnProfile) {
       const currentRole = editingProfile.role;
       if (updatedData.role !== currentRole) {
-        setError('You cannot change your own role.');
+        setError('Sie können Ihre eigene Rolle nicht ändern.');
         setEditingProfile(null);
         return;
       }
@@ -296,7 +296,7 @@ export default function AdminProfilesPage() {
       });
 
       if (!updateResult.success) {
-        throw new Error(updateResult.error || 'Failed to update profile');
+        throw new Error(updateResult.error || 'Profil konnte nicht aktualisiert werden');
       }
 
       // Handle role change if different
@@ -309,7 +309,7 @@ export default function AdminProfilesPage() {
           const revokeResult = await revokeRoleFromUser(editingProfile.id, currentRole);
           if (!revokeResult.success) {
             if (!revokeResult.error?.includes('not found') && !revokeResult.error?.includes('does not exist')) {
-              throw new Error(revokeResult.error || 'Failed to revoke role');
+              throw new Error(revokeResult.error || 'Rolle konnte nicht entzogen werden');
             }
           }
         }
@@ -317,7 +317,7 @@ export default function AdminProfilesPage() {
         else if (newRole && !currentRole) {
           const grantResult = await grantRoleToUser(editingProfile.id, newRole);
           if (!grantResult.success) {
-            throw new Error(grantResult.error || 'Failed to grant role');
+            throw new Error(grantResult.error || 'Rolle konnte nicht zugewiesen werden');
           }
         }
         // Case 3: Changing from one role to another - revoke old and grant new
@@ -325,17 +325,17 @@ export default function AdminProfilesPage() {
           const revokeResult = await revokeRoleFromUser(editingProfile.id, currentRole);
           if (!revokeResult.success) {
             if (!revokeResult.error?.includes('not found') && !revokeResult.error?.includes('does not exist')) {
-              throw new Error(revokeResult.error || 'Failed to revoke role');
+              throw new Error(revokeResult.error || 'Rolle konnte nicht entzogen werden');
             }
           }
           const grantResult = await grantRoleToUser(editingProfile.id, newRole);
           if (!grantResult.success) {
-            throw new Error(grantResult.error || 'Failed to grant role');
+            throw new Error(grantResult.error || 'Rolle konnte nicht zugewiesen werden');
           }
         }
       }
 
-      setSuccess('Profile updated successfully');
+      setSuccess('Profil erfolgreich aktualisiert');
       await loadProfiles();
       
       // Close edit modal after successful save
@@ -345,7 +345,7 @@ export default function AdminProfilesPage() {
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
       console.error('Error updating profile:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update profile';
+      const errorMessage = err instanceof Error ? err.message : 'Profil konnte nicht aktualisiert werden';
       setError(errorMessage);
       // Keep edit modal open on error so user can retry
     } finally {
@@ -369,7 +369,7 @@ export default function AdminProfilesPage() {
       <div className="main-container">
         <div style={{ textAlign: 'center', padding: '40px' }}>
           <div className="loading" style={{ margin: '0 auto' }}></div>
-          <p style={{ marginTop: '20px', color: 'var(--text-secondary)' }}>Loading profiles...</p>
+          <p style={{ marginTop: '20px', color: 'var(--text-secondary)' }}>Profile werden geladen...</p>
         </div>
       </div>
     );
@@ -380,10 +380,10 @@ export default function AdminProfilesPage() {
       <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
         <div style={{ marginBottom: '24px' }}>
           <h1 style={{ fontSize: '28px', fontWeight: '600', marginBottom: '8px', color: 'var(--text-primary)' }}>
-            User Profiles Management
+            Benutzerprofile-Verwaltung
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-            Manage user profiles and assign roles
+            Benutzerprofile verwalten und Rollen zuweisen
           </p>
           {/* <div style={{ marginTop: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button
@@ -422,7 +422,7 @@ export default function AdminProfilesPage() {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by name or email..."
+            placeholder="Nach Name oder E-Mail suchen..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
@@ -508,7 +508,7 @@ export default function AdminProfilesPage() {
                     onClick={() => handleSort('first_name')}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      First Name
+                      Vorname
                       {sortField === 'first_name' && (
                         sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
                       )}
@@ -527,7 +527,7 @@ export default function AdminProfilesPage() {
                     onClick={() => handleSort('last_name')}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      Last Name
+                      Nachname
                       {sortField === 'last_name' && (
                         sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
                       )}
@@ -553,13 +553,13 @@ export default function AdminProfilesPage() {
                     </div>
                   </th>
                   <th style={{ padding: '16px', textAlign: 'left', fontWeight: '600', fontSize: '13px', color: 'var(--text-primary)' }}>
-                    Metabase Dashboard ID
+                    Metabase Dashboard-ID
                   </th>
                   <th style={{ padding: '16px', textAlign: 'left', fontWeight: '600', fontSize: '13px', color: 'var(--text-primary)' }}>
-                    Role
+                    Rolle
                   </th>
                   <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', fontSize: '13px', color: 'var(--text-primary)' }}>
-                    Actions
+                    Aktionen
                   </th>
                 </tr>
               </thead>
@@ -567,7 +567,7 @@ export default function AdminProfilesPage() {
                 {paginatedProfiles.length === 0 ? (
                   <tr>
                     <td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                      {searchQuery ? 'No profiles found matching your search' : 'No profiles found'}
+                      {searchQuery ? 'Keine Profile gefunden, die Ihrer Suche entsprechen' : 'Keine Profile gefunden'}
                     </td>
                   </tr>
                 ) : (
@@ -609,7 +609,7 @@ export default function AdminProfilesPage() {
                             {profile.role.replace('_', ' ')}
                           </span>
                         ) : (
-                          <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>No Role</span>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Keine Rolle</span>
                         )}
                       </td>
                       <td style={{ padding: '16px', textAlign: 'right', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
@@ -638,7 +638,7 @@ export default function AdminProfilesPage() {
                             }}
                           >
                             <Edit2 className="h-4 w-4" />
-                            Edit
+                            Bearbeiten
                           </button>
                         ) : (
                           <span style={{
@@ -647,7 +647,7 @@ export default function AdminProfilesPage() {
                             fontSize: '13px',
                             fontStyle: 'italic'
                           }}>
-                            Restricted
+                            Eingeschränkt
                           </span>
                         )}
 
@@ -678,10 +678,10 @@ export default function AdminProfilesPage() {
                             {deletingUserId === profile.id ? (
                               <>
                                 <div className="loading" style={{ width: '14px', height: '14px', borderWidth: '2px' }}></div>
-                                Deleting...
+                                Wird gelöscht...
                               </>
                             ) : (
-                              'Delete'
+                              'Löschen'
                             )}
                           </button>
                         )}
@@ -703,7 +703,7 @@ export default function AdminProfilesPage() {
               alignItems: 'center'
             }}>
               <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-                Showing {startIndex + 1} to {Math.min(endIndex, filteredProfiles.length)} of {filteredProfiles.length} profiles
+                Zeige {startIndex + 1} bis {Math.min(endIndex, filteredProfiles.length)} von {filteredProfiles.length} Profilen
               </div>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <button
@@ -723,10 +723,10 @@ export default function AdminProfilesPage() {
                   }}
                 >
                   <ChevronLeft className="h-4 w-4" />
-                  Previous
+                  Zurück
                 </button>
                 <span style={{ color: 'var(--text-secondary)', fontSize: '14px', padding: '0 8px' }}>
-                  Page {currentPage} of {totalPages}
+                  Seite {currentPage} von {totalPages}
                 </span>
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
@@ -744,7 +744,7 @@ export default function AdminProfilesPage() {
                     fontSize: '13px'
                   }}
                 >
-                  Next
+                  Weiter
                   <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
@@ -771,11 +771,11 @@ export default function AdminProfilesPage() {
         isOpen={isDeleteModalOpen}
         onClose={closeDeleteModal}
         onConfirm={handleDeleteUser}
-        title="Delete User Account"
+        title="Benutzerkonto löschen"
         message={
           userToDelete
-            ? `Are you sure you want to delete ${userToDelete.email || 'this user'}? This will remove the account and associated profile.`
-            : 'Are you sure you want to delete this user?'
+            ? `Sind Sie sicher, dass Sie ${userToDelete.email || 'diesen Benutzer'} löschen möchten? Dies entfernt das Konto und das zugehörige Profil.`
+            : 'Sind Sie sicher, dass Sie diesen Benutzer löschen möchten?'
         }
       />
 

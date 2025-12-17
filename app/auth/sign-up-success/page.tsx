@@ -14,14 +14,14 @@ export default function Page() {
           <Card>
             <CardHeader>
               <CardTitle className="text-2xl">
-                Thank you for signing up!
+                Vielen Dank für Ihre Registrierung!
               </CardTitle>
-              <CardDescription>Check your email to confirm</CardDescription>
+              <CardDescription>Bitte prüfen Sie Ihre E-Mail zur Bestätigung</CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                You&apos;ve successfully signed up for EMC Sales App. Please check your email to
-                confirm your account before signing in.
+                Sie haben sich erfolgreich für die EMC Sales App registriert. Bitte prüfen Sie Ihre E-Mail, um
+                Ihr Konto zu bestätigen, bevor Sie sich anmelden.
               </p>
             </CardContent>
           </Card>

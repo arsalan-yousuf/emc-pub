@@ -15,14 +15,14 @@ export default function TabNavigation({ activeTab, onTabChange, showViewSummarie
         onClick={() => onTabChange('generator')}
       >
         <Mic className="h-6 w-6" style={{ color: activeTab === 'generator' ? '#2563eb' : 'inherit' }} />
-        Summary Generator
+        Zusammenfassung generieren
       </button>
       <button 
         className={`tab-button ${activeTab === 'history' ? 'active' : ''}`}
         onClick={() => onTabChange('history')}
       >
         <History className="h-6 w-6" style={{ color: activeTab === 'history' ? '#2563eb' : 'inherit' }} />
-        History
+        Verlauf
       </button>
       {showViewSummaries && (
         <button 
@@ -30,7 +30,7 @@ export default function TabNavigation({ activeTab, onTabChange, showViewSummarie
           onClick={() => onTabChange('view-summaries')}
         >
           <Eye className="h-6 w-6" style={{ color: activeTab === 'view-summaries' ? '#2563eb' : 'inherit' }} />
-          View Summaries
+          Zusammenfassungen anzeigen
         </button>
       )}
     </div>

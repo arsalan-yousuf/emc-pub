@@ -44,13 +44,13 @@ export function LogoutButton(props: { title?: string; isCollapsed?: boolean }) {
       className="nav-action-btn nav-action-btn-logout"
       onClick={logout}
       disabled={isLoggingOut}
-      title={props.isCollapsed ? 'Logout' : undefined}
+      title={props.isCollapsed ? 'Abmelden' : undefined}
       type="button"
     >
       <LogOut className="nav-action-icon" />
       {!props.isCollapsed && (
         <span className="nav-action-label">
-          {isLoggingOut ? 'Logging out...' : props.title || 'Logout'}
+          {isLoggingOut ? 'Wird abgemeldet...' : props.title || 'Abmelden'}
         </span>
       )}
     </button>

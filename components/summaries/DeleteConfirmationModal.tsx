@@ -15,8 +15,8 @@ export default function DeleteConfirmationModal({
   isOpen, 
   onClose, 
   onConfirm,
-  title = 'Delete Summary',
-  message = 'Are you sure you want to delete this summary? This action cannot be undone.'
+  title = 'Zusammenfassung löschen',
+  message = 'Sind Sie sicher, dass Sie diese Zusammenfassung löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.'
 }: DeleteConfirmationModalProps) {
   if (!isOpen) return null;
 
@@ -73,7 +73,7 @@ export default function DeleteConfirmationModal({
                   minWidth: '100px'
                 }}
               >
-                Cancel
+                Abbrechen
               </button>
               <button
                 type="button"
@@ -86,7 +86,7 @@ export default function DeleteConfirmationModal({
                   minWidth: '100px'
                 }}
               >
-                Delete
+                Löschen
               </button>
             </div>
           </div>

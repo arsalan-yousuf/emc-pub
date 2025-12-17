@@ -79,15 +79,15 @@ export default function AnalyticsPage() {
         <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm z-10">
           <Card className="w-full max-w-md">
             <CardHeader>
-              <CardTitle className="text-center">Loading Analytics</CardTitle>
+              <CardTitle className="text-center">Auswertungen werden geladen</CardTitle>
               <CardDescription className="text-center">
-                Connecting to the analytics dashboard...
+                Verbindung zum Analytics-Dashboard wird hergestellt...
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col items-center gap-4">
               <div className="loading" style={{ width: '40px', height: '40px', borderWidth: '4px' }}></div>
               <p className="text-sm text-muted-foreground text-center">
-                This may take a few moments if you're not on the office network.
+                Dies kann einen Moment dauern, wenn Sie nicht im Büronetzwerk sind.
               </p>
             </CardContent>
           </Card>
@@ -101,15 +101,15 @@ export default function AnalyticsPage() {
               <div className="flex items-center justify-center mb-2">
                 <AlertCircle className="h-12 w-12 text-destructive" />
               </div>
-              <CardTitle className="text-center">Service Unavailable</CardTitle>
+              <CardTitle className="text-center">Service nicht verfügbar</CardTitle>
               <CardDescription className="text-center">
-                Unable to connect to the analytics dashboard
+                Verbindung zum Analytics-Dashboard konnte nicht hergestellt werden
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col items-center gap-4">
               <p className="text-sm text-muted-foreground text-center">
-                The analytics tool may be unavailable or you may not be connected to the office network.
-                Please check your connection and try again.
+                Das Analytics-Tool ist möglicherweise nicht verfügbar oder Sie sind nicht mit dem Büronetzwerk verbunden.
+                Bitte überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.
               </p>
               <Button 
                 onClick={handleRetry} 
@@ -119,12 +119,12 @@ export default function AnalyticsPage() {
                 {isRetrying ? (
                   <>
                     <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                    Retrying...
+                    Wird erneut versucht...
                   </>
                 ) : (
                   <>
                     <RefreshCw className="mr-2 h-4 w-4" />
-                    Retry Connection
+                    Verbindung erneut versuchen
                   </>
                 )}
               </Button>
@@ -138,7 +138,7 @@ export default function AnalyticsPage() {
         src={analyticsUrl}
         width="100%"
         height="100%"
-        title="Analytics Dashboard"
+        title="Analytics-Dashboard"
         allow="fullscreen"
         onLoad={handleIframeLoad}
         onError={handleIframeError}

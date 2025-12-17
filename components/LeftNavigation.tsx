@@ -37,7 +37,7 @@ const navItems: NavItem[] = [
   { label: 'E-Mail-Generator', href: '/emailgen', icon: Mail },
   { label: 'Kundensuche', href: '/customers', icon: Search },
   { label: 'Auswertungen', href: '/analytics', icon: BarChart },
-  { label: 'Gesprächs-Zusammenfassung', href: '/summaries', icon: FileText },
+  { label: 'Call-Zusammenfassung', href: '/summaries', icon: FileText },
   { label: 'Benutzerprofile', href: '/admin/profiles', icon: User, adminOnly: true },
 ];
 
@@ -159,7 +159,7 @@ export default function LeftNavigation() {
   return (
     <nav 
       className={`left-navigation ${isCollapsed ? 'collapsed' : 'expanded'}`}
-      aria-label="Main navigation"
+      aria-label="Hauptnavigation"
     >
       <div className="nav-content">
         {/* App Title */}
@@ -177,7 +177,7 @@ export default function LeftNavigation() {
         <button
           className="nav-toggle-btn"
           onClick={toggleCollapse}
-          aria-label={isCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+          aria-label={isCollapsed ? 'Navigation erweitern' : 'Navigation einklappen'}
         >
           {isCollapsed ? (
             <ChevronRight className="nav-toggle-icon" />
@@ -266,7 +266,7 @@ export default function LeftNavigation() {
             {!isCollapsed && (
               <div className="nav-user-info">
                 <div className="nav-user-name" title={user.email}>
-                  {user.name || user.email?.split('@')[0] || 'User'}
+                  {user.name || user.email?.split('@')[0] || 'Benutzer'}
                 </div>
                 {user.email && user.name && (
                   <div className="nav-user-email" title={user.email}>
@@ -289,7 +289,7 @@ export default function LeftNavigation() {
                 const nextIndex = (currentIndex + 1) % themes.length;
                 setTheme(themes[nextIndex]);
               }}
-              title={isCollapsed ? `Theme: ${theme || 'system'}` : undefined}
+              title={isCollapsed ? `Design: ${theme || 'system'}` : undefined}
             >
               {theme === 'light' ? (
                 <Sun className="nav-action-icon" />
@@ -298,7 +298,7 @@ export default function LeftNavigation() {
               ) : (
                 <Laptop className="nav-action-icon" />
               )}
-              {!isCollapsed && <span className="nav-action-label">Theme</span>}
+              {!isCollapsed && <span className="nav-action-label">Design</span>}
             </button>
           )}
           

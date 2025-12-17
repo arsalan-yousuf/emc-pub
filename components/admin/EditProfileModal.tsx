@@ -115,7 +115,7 @@ export default function EditProfileModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="settings-header">
-          <h3>Edit Profile</h3>
+          <h3>Profil bearbeiten</h3>
           <button
             type="button"
             className="close-modal"
@@ -137,7 +137,7 @@ export default function EditProfileModal({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: '1' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-primary)' }}>
-                  First Name
+                  Vorname
                 </label>
                 <input
                   type="text"
@@ -159,7 +159,7 @@ export default function EditProfileModal({
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-primary)' }}>
-                  Last Name
+                  Nachname
                 </label>
                 <input
                   type="text"
@@ -203,7 +203,7 @@ export default function EditProfileModal({
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-primary)' }}>
-                  Metabase Dashboard ID
+                  Metabase Dashboard-ID
                 </label>
                 <input
                   type="number"
@@ -228,7 +228,7 @@ export default function EditProfileModal({
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-primary)' }}>
-                  Role
+                  Rolle
                 </label>
                 <select
                   key={`role-select-${profile.id}-${role || 'none'}`}
@@ -250,9 +250,9 @@ export default function EditProfileModal({
                     opacity: isEditingOwnProfile ? 0.6 : 1
                   }}
                 >
-                  <option value="">No Role</option>
-                  <option value="sales">Sales</option>
-                  <option value="sales_support">Sales Support</option>
+                  <option value="">Keine Rolle</option>
+                  <option value="sales">Verkauf</option>
+                  <option value="sales_support">Verkaufsunterstützung</option>
                   {currentUserIsSuperAdmin && (
                     <>
                       <option value="admin" key="admin">Admin</option>
@@ -297,7 +297,7 @@ export default function EditProfileModal({
                   e.currentTarget.style.background = 'var(--input-bg)';
                 }}
               >
-                Cancel
+                Abbrechen
               </button>
               <button
                 type="button"
@@ -320,7 +320,7 @@ export default function EditProfileModal({
                   opacity: isSaving ? 0.6 : 1
                 }}
               >
-                {isSaving ? 'Saving...' : 'Save Changes'}
+                {isSaving ? 'Wird gespeichert...' : 'Änderungen speichern'}
               </button>
             </div>
           </form>

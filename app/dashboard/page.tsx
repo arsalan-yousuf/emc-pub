@@ -37,11 +37,9 @@ export default function ProtectedPage() {
   }, []);
 
   const handleChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
-    console.log("handleChange", event.target.value);
     const newProfileId = event.target.value;
     setSelectedProfileId(newProfileId);
     const profile = profiles.find((p) => p.id === newProfileId);
-console.log("profile", profile);
     if (!profile || !profile.dashboardId) {
       setCurrentDashboardId(null);
       setCurrentUrl(null);
@@ -53,7 +51,6 @@ console.log("profile", profile);
     setIsLoading(true);
     try {
       const url = await refreshDashboardUrl(profile.dashboardId);
-      console.log("url", url);
       setCurrentDashboardId(profile.dashboardId);
       setCurrentUrl(url);
     } catch (err) {
@@ -71,7 +68,7 @@ console.log("profile", profile);
       <div className="w-full h-full flex items-center justify-center p-8">
         <div className="text-center">
           <div className="loading" style={{ margin: "0 auto" }}></div>
-          <p className="text-sm text-muted-foreground mt-4">Loading dashboard...</p>
+          <p className="text-sm text-muted-foreground mt-4">Dashboard wird geladen...</p>
         </div>
       </div>
     );
@@ -81,9 +78,9 @@ console.log("profile", profile);
     return (
       <div className="w-full flex items-center justify-center p-8">
         <div className="text-center">
-          <p className="text-lg text-muted-foreground mb-2">Dashboard not configured</p>
+          <p className="text-lg text-muted-foreground mb-2">Dashboard nicht konfiguriert</p>
           <p className="text-sm text-muted-foreground">
-            Please contact your administrator to set up your dashboard.
+            Bitte kontaktieren Sie Ihren Administrator, um Ihr Dashboard einzurichten.
           </p>
         </div>
       </div>

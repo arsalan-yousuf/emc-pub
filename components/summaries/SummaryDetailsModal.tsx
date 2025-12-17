@@ -110,11 +110,11 @@ export default function SummaryDetailsModal({
         // Update selectedItem with new data
         Object.assign(selectedItem, editedData);
       } else {
-        alert(result.error || 'Failed to update summary');
+        alert(result.error || 'Zusammenfassung konnte nicht aktualisiert werden');
       }
     } catch (error) {
       console.error('Error updating summary:', error);
-      alert('An error occurred while updating the summary');
+      alert('Beim Aktualisieren der Zusammenfassung ist ein Fehler aufgetreten');
     } finally {
       setIsSaving(false);
     }
@@ -126,7 +126,7 @@ export default function SummaryDetailsModal({
         <div className="settings-header">
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <FileText className="h-5 w-5" />
-            Summary Details
+            Zusammenfassungsdetails
           </h3>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {!isEditing ? (
@@ -138,7 +138,7 @@ export default function SummaryDetailsModal({
                   style={{ padding: '6px 12px', fontSize: '14px' }}
                 >
                   <Edit2 className="h-4 w-4" />
-                  Edit
+                  Bearbeiten
                 </button>
               ) : null
             ) : (
@@ -157,7 +157,7 @@ export default function SummaryDetailsModal({
                   }}
                 >
                   <Save className="h-4 w-4" />
-                  {isSaving ? 'Saving...' : 'Save'}
+                  {isSaving ? 'Wird gespeichert...' : 'Speichern'}
                 </button>
                 <button 
                   type="button"
@@ -173,7 +173,7 @@ export default function SummaryDetailsModal({
                   }}
                 >
                   <XCircle className="h-4 w-4" />
-                  Cancel
+                  Abbrechen
                 </button>
               </>
             )}
@@ -189,7 +189,7 @@ export default function SummaryDetailsModal({
         </div>
         <div className="settings-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
           <div className="detail-section">
-            <h4>Customer Information:</h4>
+            <h4>Kundeninformationen:</h4>
             {isEditing ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div>
@@ -218,7 +218,7 @@ export default function SummaryDetailsModal({
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>Email:</label>
+                  <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>E-Mail:</label>
                   <input
                     type="email"
                     value={editedData.customer_email}
@@ -235,7 +235,7 @@ export default function SummaryDetailsModal({
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>Phone:</label>
+                  <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>Telefon:</label>
                   <input
                     type="tel"
                     value={editedData.customer_phone}
@@ -252,10 +252,10 @@ export default function SummaryDetailsModal({
                   />
                 </div>
                 <div className="settings-info">
-                  <p><strong>Language:</strong> {selectedItem.language}</p>
-                  <p><strong>Created:</strong> {formatDate(selectedItem.created_at || '')}</p>
+                  <p><strong>Sprache:</strong> {selectedItem.language}</p>
+                  <p><strong>Erstellt:</strong> {formatDate(selectedItem.created_at || '')}</p>
                   {selectedItem.user_name && (
-                    <p><strong>Created by:</strong> {selectedItem.user_name} ({selectedItem.user_email})</p>
+                    <p><strong>Erstellt von:</strong> {selectedItem.user_name} ({selectedItem.user_email})</p>
                   )}
                 </div>
               </div>
@@ -266,21 +266,21 @@ export default function SummaryDetailsModal({
                   <p><strong>Partner:</strong> {selectedItem.customer_partner}</p>
                 )}
                 {selectedItem.customer_email && (
-                  <p><strong>Email:</strong> {selectedItem.customer_email}</p>
+                  <p><strong>E-Mail:</strong> {selectedItem.customer_email}</p>
                 )}
                 {selectedItem.customer_phone && (
-                  <p><strong>Phone:</strong> {selectedItem.customer_phone}</p>
+                  <p><strong>Telefon:</strong> {selectedItem.customer_phone}</p>
                 )}
-                <p><strong>Language:</strong> {selectedItem.language}</p>
-                <p><strong>Created:</strong> {formatDate(selectedItem.created_at || '')}</p>
+                <p><strong>Sprache:</strong> {selectedItem.language}</p>
+                <p><strong>Erstellt:</strong> {formatDate(selectedItem.created_at || '')}</p>
                 {selectedItem.user_name && (
-                  <p><strong>Created by:</strong> {selectedItem.user_name} ({selectedItem.user_email})</p>
+                  <p><strong>Erstellt von:</strong> {selectedItem.user_name} ({selectedItem.user_email})</p>
                 )}
               </div>
             )}
           </div>
           <div className="detail-section">
-            <h4>Transcript:</h4>
+            <h4>Transkript:</h4>
             {isEditing ? (
               <textarea
                 value={editedData.transcript}
@@ -308,7 +308,7 @@ export default function SummaryDetailsModal({
             )}
           </div>
           <div className="detail-section">
-            <h4>Summary:</h4>
+            <h4>Zusammenfassung:</h4>
             {isEditing ? (
               <textarea
                 value={editedData.summary}
@@ -343,7 +343,7 @@ export default function SummaryDetailsModal({
                 onClick={(e) => onCopySummary?.(selectedItem.summary, 'summary', e)}
               >
                 <Copy className="h-4 w-4" />
-                Copy Summary
+                Zusammenfassung kopieren
               </button>
               <button 
                 type="button"
@@ -351,7 +351,7 @@ export default function SummaryDetailsModal({
                 onClick={(e) => onCopySummary?.(selectedItem.transcript, 'transcript', e)}
               >
                 <Copy className="h-4 w-4" />
-                Copy Transcript
+                Transkript kopieren
               </button>
             </div>
           )}

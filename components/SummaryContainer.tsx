@@ -115,12 +115,12 @@ export default function SummaryContainer({ initialRole = null }: SummaryContaine
     try {
       await navigator.clipboard.writeText(text);
       const message = type === 'summary' 
-        ? 'Summary copied to clipboard!' 
-        : 'Transcript copied to clipboard!';
+        ? 'Zusammenfassung in die Zwischenablage kopiert!' 
+        : 'Transkript in die Zwischenablage kopiert!';
       showToast('success', message);
     } catch (error) {
       console.error('Failed to copy to clipboard:', error);
-      showToast('error', 'Failed to copy to clipboard');
+      showToast('error', 'In die Zwischenablage kopieren fehlgeschlagen');
     }
   };
 
@@ -136,14 +136,14 @@ export default function SummaryContainer({ initialRole = null }: SummaryContaine
     try {
       const result = await deleteSummary(summaryToDelete);
       if (result.success) {
-        showToast('success', 'Summary deleted successfully');
+        showToast('success', 'Zusammenfassung erfolgreich gelöscht');
         setHistoryRefreshTrigger(prev => prev + 1);
       } else {
-        showToast('error', result.error || 'Failed to delete summary');
+        showToast('error', result.error || 'Zusammenfassung konnte nicht gelöscht werden');
       }
     } catch (error) {
       console.error('Error deleting summary:', error);
-      showToast('error', 'An error occurred while deleting the summary');
+      showToast('error', 'Beim Löschen der Zusammenfassung ist ein Fehler aufgetreten');
     } finally {
       setIsDeleting(false);
       setSummaryToDelete(null);
@@ -170,8 +170,8 @@ export default function SummaryContainer({ initialRole = null }: SummaryContaine
   return (
     <>
       <div className="main-container">
-        <h1>Call Summary Generator</h1>
-        <p className="subtitle">Generate structured summaries from voice recordings</p>
+        <h1>Call-Zusammenfassungs-Generator</h1>
+        <p className="subtitle">Strukturierte Zusammenfassungen aus Sprachaufnahmen generieren</p>
 
         <TabNavigation
           activeTab={activeTab}
@@ -217,7 +217,7 @@ export default function SummaryContainer({ initialRole = null }: SummaryContaine
         onCopySummary={handleCopySummary}
         onSummaryUpdated={() => {
           setHistoryRefreshTrigger(prev => prev + 1);
-          showToast('success', 'Summary updated successfully');
+          showToast('success', 'Zusammenfassung erfolgreich aktualisiert');
         }}
         canEdit={canManageSummaries}
       />
