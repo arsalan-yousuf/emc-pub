@@ -15,6 +15,7 @@ interface GeneratorTabProps {
 export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTabProps) {
   const [language, setLanguage] = useState<'german' | 'english'>('german');
   const [customerName, setCustomerName] = useState('');
+  const [customerPartner, setCustomerPartner] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [transcript, setTranscript] = useState('');
@@ -126,6 +127,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
       const result = await saveSummary({
         user_id: userId,
         customer_name: customerName,
+        customer_partner: customerPartner || undefined,
         customer_email: customerEmail || undefined,
         customer_phone: customerPhone || undefined,
         transcript,
@@ -141,6 +143,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
         setEditedSummary('');
         setIsEditingSummary(false);
         setCustomerName('');
+        setCustomerPartner('');
         setCustomerEmail('');
         setCustomerPhone('');
         // Trigger history refresh
@@ -188,10 +191,10 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
         {/* Customer Information */}
         <div className="input-section">
           <h3 style={{ marginBottom: '15px', fontWeight: '600' }}>Customer Information</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '15px' }}>
             <div>
               <label htmlFor="customerName" style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
-                Customer Name *
+               Kundenname *
               </label>
               <input
                 id="customerName"
@@ -199,6 +202,28 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
                 placeholder="John Doe"
+                required
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '2px solid var(--border-color)',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  background: 'var(--input-bg)',
+                  color: 'var(--text-primary)'
+                }}
+              />
+            </div>
+            <div>
+              <label htmlFor="customerPartner" style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+              Gesprächspartner *
+              </label>
+              <input
+                id="customerPartner"
+                type="text"
+                value={customerPartner}
+                onChange={(e) => setCustomerPartner(e.target.value)}
+                placeholder="Jane Doe"
                 required
                 style={{
                   width: '100%',
@@ -220,7 +245,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
                 type="email"
                 value={customerEmail}
                 onChange={(e) => setCustomerEmail(e.target.value)}
-                placeholder="email@example.com"
+                placeholder="john.doe@example.com"
                 style={{
                   width: '100%',
                   padding: '12px',

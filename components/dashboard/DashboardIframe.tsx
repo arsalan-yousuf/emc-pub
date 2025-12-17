@@ -1,33 +1,39 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 
 interface DashboardIframeProps {
+  iframeKey: string;
   iframeUrl: string;
   dashboardId: number;
   refreshDashboardUrl: (dashboardId: number) => Promise<string>;
 }
 
-export default function DashboardIframe({ iframeUrl, dashboardId, refreshDashboardUrl }: DashboardIframeProps) {
+export default function DashboardIframe({ iframeKey, iframeUrl, dashboardId, refreshDashboardUrl }: DashboardIframeProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [currentUrl, setCurrentUrl] = useState(iframeUrl);
-
+  // const [currentUrl, setCurrentUrl] = useState<string | null>(null);
+console.log("Rafaqat", iframeKey, "iframeUrl", iframeUrl);
   const handleRefresh = async () => {
     setIsRefreshing(true);
     
     try {
       // Regenerate the iframe URL with a fresh JWT token via server action
       const newUrl = await refreshDashboardUrl(dashboardId);
-      setCurrentUrl(newUrl);
+      if (iframeRef.current) {
+        iframeRef.current.src = newUrl;
+      }
+      // setCurrentUrl(newUrl);
     } catch (error) {
       console.error('Error refreshing dashboard:', error);
     } finally {
       setIsRefreshing(false);
     }
   };
-
+// useEffect(() => {
+//   setCurrentUrl(iframeUrl);
+// }, [iframeUrl]);
   return (
     <div className="w-full h-full relative">
       {/* Refresh Button - positioned relative to container */}
@@ -47,9 +53,12 @@ export default function DashboardIframe({ iframeUrl, dashboardId, refreshDashboa
       </div>
 
       {/* Iframe */}
-      <iframe
+      {iframeUrl && <iframe
+      // id={iframeKey+'iframe'}
+        key={iframeKey +'iframe'}
         ref={iframeRef}
-        src={currentUrl}
+        src={iframeUrl}
+        // src={currentUrl}
         width="100%"
         height="100%"
         style={{ 
@@ -59,7 +68,7 @@ export default function DashboardIframe({ iframeUrl, dashboardId, refreshDashboa
           display: 'block'
         }}
         className="rounded-lg"
-      />
+      />}
     </div>
   );
 }

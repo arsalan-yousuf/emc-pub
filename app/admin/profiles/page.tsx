@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { isAdmin, isSuperAdmin, grantRoleToUser, revokeRoleFromUser, type UserRole } from '@/lib/user-roles';
-import { fetchProfiles, type ProfileWithRole } from '@/lib/profiles-server';
+import { fetchProfiles, type ProfileWithRole, deleteUserAccount, updateUserProfile } from '@/lib/profiles-server';
 import { useRouter } from 'next/navigation';
 import { Edit2, Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, User, Shield } from 'lucide-react';
 import EditProfileModal from '@/components/admin/EditProfileModal';
+import DeleteConfirmationModal from '@/components/summaries/DeleteConfirmationModal';
 
 
 type SortField = 'first_name' | 'last_name' | 'email' | 'created_at';
@@ -28,6 +28,11 @@ export default function AdminProfilesPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<ProfileWithRole | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const isLoadingRef = useRef(false);
 
   const itemsPerPage = 10;
 
@@ -50,6 +55,8 @@ export default function AdminProfilesPage() {
 
   // Load profiles using server action
   const loadProfiles = async () => {
+    if (isLoadingRef.current) return;
+    isLoadingRef.current = true;
     try {
       setIsLoading(true);
       setError(null);
@@ -83,8 +90,20 @@ export default function AdminProfilesPage() {
       setError(errorMessage);
     } finally {
       setIsLoading(false);
+      isLoadingRef.current = false;
     }
   };
+
+  // Refresh on window focus to ensure data is fresh when navigating back to this tab
+  useEffect(() => {
+    const handleFocus = () => {
+      if (isAuthorized) {
+        loadProfiles();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [isAuthorized]);
 
   // Filter and sort profiles
   useEffect(() => {
@@ -181,6 +200,52 @@ export default function AdminProfilesPage() {
     setEditingProfile(profile);
   };
 
+  const handleDeleteUser = async () => {
+    const profile = userToDelete;
+    if (!profile) return;
+
+    if (!currentUserIsSuperAdmin) {
+      setError('Only super admins can delete user accounts.');
+      setTimeout(() => setError(null), 4000);
+      return;
+    }
+
+    if (currentUserId && profile.id === currentUserId) {
+      setError('You cannot delete your own account.');
+      setTimeout(() => setError(null), 4000);
+      return;
+    }
+
+    setDeletingUserId(profile.id);
+    setError(null);
+    setSuccess(null);
+    try {
+      const result = await deleteUserAccount(profile.id);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to delete user');
+      }
+      setSuccess('User deleted successfully');
+      await loadProfiles();
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      console.error('Error deleting user:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete user';
+      setError(errorMessage);
+    } finally {
+      setDeletingUserId(null);
+    }
+  };
+
+  const openDeleteModal = (profile: ProfileWithRole) => {
+    setUserToDelete(profile);
+    setIsDeleteModalOpen(true);
+  };
+
+  const closeDeleteModal = () => {
+    setIsDeleteModalOpen(false);
+    setUserToDelete(null);
+  };
+
   // Handle save profile - directly saves without confirmation
   const handleSaveProfile = async (updatedData: {
     first_name: string;
@@ -223,22 +288,15 @@ export default function AdminProfilesPage() {
     setSuccess(null);
 
     try {
-      const supabase = createClient();
-      
-      // Update profile data
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          first_name: updatedData.first_name,
-          last_name: updatedData.last_name,
-          email: updatedData.email,
-          metabase_dashboard_id: updatedData.metabase_dashboard_id
-        })
-        .eq('id', editingProfile.id)
-        .select();
-      
-      if (updateError) {
-        throw updateError;
+      const updateResult = await updateUserProfile(editingProfile.id, {
+        first_name: updatedData.first_name,
+        last_name: updatedData.last_name,
+        email: updatedData.email,
+        metabase_dashboard_id: updatedData.metabase_dashboard_id
+      });
+
+      if (!updateResult.success) {
+        throw new Error(updateResult.error || 'Failed to update profile');
       }
 
       // Handle role change if different
@@ -327,6 +385,36 @@ export default function AdminProfilesPage() {
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
             Manage user profiles and assign roles
           </p>
+          {/* <div style={{ marginTop: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              onClick={async () => {
+                setIsRefreshing(true);
+                await loadProfiles();
+                setIsRefreshing(false);
+              }}
+              disabled={isLoading || isRefreshing}
+              style={{
+                padding: '8px 12px',
+                border: '1px solid var(--border-color)',
+                borderRadius: '8px',
+                background: 'var(--input-bg)',
+                color: 'var(--text-primary)',
+                cursor: isLoading || isRefreshing ? 'not-allowed' : 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '13px'
+              }}
+            >
+              <div className="loading" style={{
+                width: '14px',
+                height: '14px',
+                borderWidth: '2px',
+                visibility: (isLoading || isRefreshing) ? 'visible' : 'hidden'
+              }}></div>
+              Refresh profiles
+            </button>
+          </div> */}
         </div>
 
         {/* Search */}
@@ -375,6 +463,24 @@ export default function AdminProfilesPage() {
             fontSize: '14px'
           }}>
             {success}
+          </div>
+        )}
+
+        {deletingUserId && (
+          <div style={{
+            padding: '12px 16px',
+            marginBottom: '16px',
+            background: 'var(--section-bg)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '8px',
+            color: 'var(--text-secondary)',
+            fontSize: '14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <div className="loading" style={{ width: '18px', height: '18px', borderWidth: '3px' }}></div>
+            Deleting user account...
           </div>
         )}
 
@@ -506,11 +612,11 @@ export default function AdminProfilesPage() {
                           <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>No Role</span>
                         )}
                       </td>
-                      <td style={{ padding: '16px', textAlign: 'right' }}>
+                      <td style={{ padding: '16px', textAlign: 'right', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                         {canEditProfile(profile) ? (
                           <button
                             onClick={() => handleEdit(profile)}
-                            disabled={isSaving}
+                            disabled={isSaving || deletingUserId === profile.id}
                             style={{
                               padding: '8px 12px',
                               background: 'transparent',
@@ -543,6 +649,41 @@ export default function AdminProfilesPage() {
                           }}>
                             Restricted
                           </span>
+                        )}
+
+                        {currentUserIsSuperAdmin && (
+                          <button
+                            onClick={() => openDeleteModal(profile)}
+                            disabled={deletingUserId === profile.id || isSaving}
+                            style={{
+                              padding: '8px 12px',
+                              background: 'transparent',
+                              border: '1px solid var(--danger-border)',
+                              borderRadius: '6px',
+                              color: 'var(--danger-text)',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              fontSize: '13px',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'var(--danger-bg)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'transparent';
+                            }}
+                          >
+                            {deletingUserId === profile.id ? (
+                              <>
+                                <div className="loading" style={{ width: '14px', height: '14px', borderWidth: '2px' }}></div>
+                                Deleting...
+                              </>
+                            ) : (
+                              'Delete'
+                            )}
+                          </button>
                         )}
                       </td>
                     </tr>
@@ -624,6 +765,19 @@ export default function AdminProfilesPage() {
           isEditingOwnProfile={currentUserId ? editingProfile.id === currentUserId : false}
         />
       )}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={closeDeleteModal}
+        onConfirm={handleDeleteUser}
+        title="Delete User Account"
+        message={
+          userToDelete
+            ? `Are you sure you want to delete ${userToDelete.email || 'this user'}? This will remove the account and associated profile.`
+            : 'Are you sure you want to delete this user?'
+        }
+      />
 
     </div>
   );

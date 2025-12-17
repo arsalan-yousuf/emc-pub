@@ -311,6 +311,7 @@ CREATE TABLE sales_summaries (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   customer_name TEXT NOT NULL,
+  customer_partner TEXT,
   customer_email TEXT,
   customer_phone TEXT,
   transcript TEXT NOT NULL,
@@ -329,25 +330,11 @@ ALTER TABLE public.sales_summaries ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "sales_summaries_select_by_role_owner" ON public.sales_summaries
   FOR SELECT TO authenticated
   USING (
-    -- super_admin or admin: full access
-    public.is_user_in_role('super_admin')
-    OR (
-      public.is_user_in_role('admin')
-      AND (
-        public.user_has_role(user_id, 'admin')
-        OR public.user_has_role(user_id, 'sales')
-        OR public.user_has_role(user_id, 'sales_support')
-      )
-    )
-    -- sales_support can view summaries whose owner is sales or sales_support
-    OR (
-      public.is_user_in_role('sales_support')
-      OR public.is_user_in_role('sales')
-      AND (
-        public.user_has_role(user_id, 'sales')
-        OR public.user_has_role(user_id, 'sales_support')
-      )
-    )
+    -- super_admin, admin, sales_support: full access
+    public.is_user_in_role('admin')
+    OR public.is_user_in_role('super_admin')
+    OR public.is_user_in_role('sales_support')
+
     -- sales can view their own summaries
     OR ( user_id = auth.uid() )
   );

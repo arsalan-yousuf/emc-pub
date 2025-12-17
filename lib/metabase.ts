@@ -10,6 +10,7 @@ const METABASE_SECRET_KEY = process.env.METABASE_SECRET_KEY || "28b7fa0e6462c8cb
  * @returns The iframe URL with embedded JWT token
  */
 export function generateMetabaseIframeUrl(dashboardId: number, expirationMinutes: number = 10): string {
+  console.log("generateMetabaseIframeUrl dashboardId: ", dashboardId);
   const payload = {
     resource: { dashboard: dashboardId },
     params: {},
@@ -18,6 +19,7 @@ export function generateMetabaseIframeUrl(dashboardId: number, expirationMinutes
 
   const token = jwt.sign(payload, METABASE_SECRET_KEY);
   const iframeUrl = `${METABASE_SITE_URL}/embed/dashboard/${token}#bordered=true&titled=true`;
+  console.log("generateMetabaseIframeUrl iframeUrl: ", iframeUrl);
 
   return iframeUrl;
 }

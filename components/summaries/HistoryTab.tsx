@@ -10,9 +10,10 @@ interface HistoryTabProps {
   onOpenSummaryModal?: (item: SummaryWithUser) => void;
   onRequestDelete?: (id: string) => void;
   isDeleting?: boolean;
+  canDelete?: boolean;
 }
 
-function HistoryTab({ showToast, refreshTrigger = 0, onOpenSummaryModal, onRequestDelete, isDeleting = false }: HistoryTabProps) {
+function HistoryTab({ showToast, refreshTrigger = 0, onOpenSummaryModal, onRequestDelete, isDeleting = false, canDelete = false }: HistoryTabProps) {
   const [history, setHistory] = useState<SummaryWithUser[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -168,16 +169,18 @@ function HistoryTab({ showToast, refreshTrigger = 0, onOpenSummaryModal, onReque
                             >
                               <Copy className="h-4 w-4" />
                             </button>
-                            <button 
-                              className="history-btn"
-                              onClick={(e) => handleDeleteItem(item.id!, e)}
-                              title="Delete"
-                            >
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </button>
+                            {canDelete && (
+                              <button 
+                                className="history-btn"
+                                onClick={(e) => handleDeleteItem(item.id!, e)}
+                                title="Delete"
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </button>
+                            )}
                           </div>
                         </div>
-                        <div className="history-subject">{item.customer_name}</div>
+                        <div className="history-subject">{item.customer_name} - {item.customer_partner}</div>
                         <div className="history-preview">{getPreviewText(item.summary, 150)}</div>
                         <div className="history-item-settings">
                           <small>

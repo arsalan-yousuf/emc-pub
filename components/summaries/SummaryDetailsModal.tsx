@@ -10,6 +10,7 @@ interface SummaryDetailsModalProps {
   selectedItem: SummaryWithUser | null;
   onCopySummary?: (text: string, type: 'summary' | 'transcript', e?: React.MouseEvent<HTMLButtonElement>) => void;
   onSummaryUpdated?: () => void;
+  canEdit?: boolean;
 }
 
 export default function SummaryDetailsModal({ 
@@ -17,12 +18,14 @@ export default function SummaryDetailsModal({
   onClose, 
   selectedItem,
   onCopySummary,
-  onSummaryUpdated
+  onSummaryUpdated,
+  canEdit = false
 }: SummaryDetailsModalProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editedData, setEditedData] = useState({
     customer_name: '',
+    customer_partner: '',
     customer_email: '',
     customer_phone: '',
     transcript: '',
@@ -34,6 +37,7 @@ export default function SummaryDetailsModal({
     if (selectedItem) {
       setEditedData({
         customer_name: selectedItem.customer_name || '',
+        customer_partner: selectedItem.customer_partner || '',
         customer_email: selectedItem.customer_email || '',
         customer_phone: selectedItem.customer_phone || '',
         transcript: selectedItem.transcript || '',
@@ -63,6 +67,7 @@ export default function SummaryDetailsModal({
   };
 
   const handleEdit = () => {
+    if (!canEdit) return;
     setIsEditing(true);
   };
 
@@ -71,6 +76,7 @@ export default function SummaryDetailsModal({
     if (selectedItem) {
       setEditedData({
         customer_name: selectedItem.customer_name || '',
+        customer_partner: selectedItem.customer_partner || '',
         customer_email: selectedItem.customer_email || '',
         customer_phone: selectedItem.customer_phone || '',
         transcript: selectedItem.transcript || '',
@@ -83,10 +89,15 @@ export default function SummaryDetailsModal({
   const handleSave = async () => {
     if (!selectedItem?.id) return;
 
+    if (!canEdit) {
+      return;
+    }
+
     setIsSaving(true);
     try {
       const result = await updateSummary(selectedItem.id, {
         customer_name: editedData.customer_name,
+        customer_partner: editedData.customer_partner || undefined,
         customer_email: editedData.customer_email || undefined,
         customer_phone: editedData.customer_phone || undefined,
         transcript: editedData.transcript,
@@ -119,22 +130,24 @@ export default function SummaryDetailsModal({
           </h3>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {!isEditing ? (
-              <button 
-                type="button"
-                className="action-button"
-                onClick={handleEdit}
-                style={{ padding: '6px 12px', fontSize: '14px' }}
-              >
-                <Edit2 className="h-4 w-4" />
-                Edit
-              </button>
+              canEdit ? (
+                <button 
+                  type="button"
+                  className="action-button"
+                  onClick={handleEdit}
+                  style={{ padding: '6px 12px', fontSize: '14px' }}
+                >
+                  <Edit2 className="h-4 w-4" />
+                  Edit
+                </button>
+              ) : null
             ) : (
               <>
                 <button 
                   type="button"
                   className="action-button"
                   onClick={handleSave}
-                  disabled={isSaving}
+                  disabled={isSaving || !canEdit}
                   style={{ 
                     padding: '6px 12px', 
                     fontSize: '14px',
@@ -197,6 +210,14 @@ export default function SummaryDetailsModal({
                   />
                 </div>
                 <div>
+                  <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>Partner:</label>
+                  <input
+                    type="text"
+                    value={editedData.customer_partner}
+                    onChange={(e) => setEditedData({ ...editedData, customer_partner: e.target.value })}
+                  />
+                </div>
+                <div>
                   <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>Email:</label>
                   <input
                     type="email"
@@ -241,6 +262,9 @@ export default function SummaryDetailsModal({
             ) : (
               <div className="settings-info">
                 <p><strong>Name:</strong> {selectedItem.customer_name}</p>
+                {selectedItem.customer_partner && (
+                  <p><strong>Partner:</strong> {selectedItem.customer_partner}</p>
+                )}
                 {selectedItem.customer_email && (
                   <p><strong>Email:</strong> {selectedItem.customer_email}</p>
                 )}

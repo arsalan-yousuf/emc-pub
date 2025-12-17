@@ -10,9 +10,10 @@ interface ViewSummariesTabProps {
   onOpenSummaryModal?: (item: SummaryWithUser) => void;
   onRequestDelete?: (id: string) => void;
   isDeleting?: boolean;
+  canDelete?: boolean;
 }
 
-function ViewSummariesTab({ showToast, refreshTrigger = 0, onOpenSummaryModal, onRequestDelete, isDeleting = false }: ViewSummariesTabProps) {
+function ViewSummariesTab({ showToast, refreshTrigger = 0, onOpenSummaryModal, onRequestDelete, isDeleting = false, canDelete = false }: ViewSummariesTabProps) {
   const [summaries, setSummaries] = useState<SummaryWithUser[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -50,6 +51,7 @@ function ViewSummariesTab({ showToast, refreshTrigger = 0, onOpenSummaryModal, o
     return summaries.filter(item => {
       return (
         item.customer_name.toLowerCase().includes(query) ||
+        (item.customer_partner && item.customer_partner.toLowerCase().includes(query)) ||
         (item.customer_email && item.customer_email.toLowerCase().includes(query)) ||
         (item.customer_phone && item.customer_phone.toLowerCase().includes(query)) ||
         item.transcript.toLowerCase().includes(query) ||
@@ -218,20 +220,22 @@ function ViewSummariesTab({ showToast, refreshTrigger = 0, onOpenSummaryModal, o
                                   >
                                     <Copy className="h-4 w-4" />
                                   </button>
-                                  <button 
-                                    className="history-btn"
-                                    onClick={(e) => handleDeleteItem(item.id!, e)}
-                                    title="Delete"
-                                  >
-                                    <Trash2 className="h-4 w-4 text-red-500" />
-                                  </button>
+                                  {canDelete && (
+                                    <button 
+                                      className="history-btn"
+                                      onClick={(e) => handleDeleteItem(item.id!, e)}
+                                      title="Delete"
+                                    >
+                                      <Trash2 className="h-4 w-4 text-red-500" />
+                                    </button>
+                                  )}
                                 </div>
                               </div>
-                              <div className="history-subject">{item.customer_name}</div>
+                              <div className="history-subject">{item.customer_name} - {item.customer_partner}</div>
                               <div className="history-preview">{getPreviewText(item.summary, 150)}</div>
                               <div className="history-item-settings">
                                 <small>
-                                  {item.language} • {item.customer_email || item.customer_phone || 'No contact'}
+                                  {item.language} • { item.customer_phone || item.customer_email || 'No contact'}
                                 </small>
                               </div>
                             </div>

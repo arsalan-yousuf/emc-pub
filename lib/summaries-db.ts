@@ -7,6 +7,7 @@ export interface SummaryData {
   id?: string;
   user_id: string;
   customer_name: string;
+  customer_partner?: string;
   customer_email?: string;
   customer_phone?: string;
   transcript: string;
@@ -31,6 +32,7 @@ export async function saveSummary(data: Omit<SummaryData, 'id' | 'created_at' | 
       .insert({
         user_id: data.user_id,
         customer_name: data.customer_name,
+        customer_partner: data.customer_partner || null,
         customer_email: data.customer_email || null,
         customer_phone: data.customer_phone || null,
         transcript: data.transcript,
@@ -59,7 +61,17 @@ export async function saveSummary(data: Omit<SummaryData, 'id' | 'created_at' | 
 export async function updateSummary(id: string, updates: Partial<SummaryData>): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = await createClient();
-    
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return { success: false, error: 'User not authenticated' };
+    }
+
+    const role = await getUserRole(user.id);
+    if (role !== 'admin' && role !== 'super_admin') {
+      return { success: false, error: 'You do not have permission to edit summaries' };
+    }
+
     const { error } = await supabase
       .from('sales_summaries')
       .update({
@@ -126,6 +138,7 @@ export async function fetchSummaries(): Promise<{ success: boolean; data?: Summa
       id: item.id,
       user_id: item.user_id,
       customer_name: item.customer_name,
+      customer_partner: item.customer_partner,
       customer_email: item.customer_email,
       customer_phone: item.customer_phone,
       transcript: item.transcript,
@@ -211,6 +224,7 @@ export async function fetchAllSummariesForView(): Promise<{ success: boolean; da
         id: item.id,
         user_id: item.user_id,
         customer_name: item.customer_name,
+        customer_partner: item.customer_partner,
         customer_email: item.customer_email,
         customer_phone: item.customer_phone,
         transcript: item.transcript,
@@ -245,21 +259,15 @@ export async function deleteSummary(id: string): Promise<{ success: boolean; err
       return { success: false, error: 'User not authenticated' };
     }
 
-    // Get user role
     const role = await getUserRole(user.id);
-    
-    // Build query
-    let query = supabase
+    if (role !== 'admin' && role !== 'super_admin') {
+      return { success: false, error: 'You do not have permission to delete summaries' };
+    }
+
+    const { error } = await supabase
       .from('sales_summaries')
       .delete()
       .eq('id', id);
-
-    // Sales can only delete their own summaries
-    if (role !== 'admin' && role !== 'sales-support') {
-      query = query.eq('user_id', user.id);
-    }
-
-    const { error } = await query;
 
     if (error) {
       console.error('Error deleting summary:', error);

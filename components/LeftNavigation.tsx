@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { isAdmin, getUserRole, isSuperAdmin } from '@/lib/user-roles';
+import { fetchCurrentProfile } from '@/lib/profiles-server';
 import type { UserRole } from '@/lib/user-roles';
 
 interface NavItem {
@@ -32,12 +33,12 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Email Gen', href: '/emailgen', icon: Mail },
-  { label: 'Customer Search', href: '/customers', icon: Search },
-  { label: 'Analytics', href: '/analytics', icon: BarChart },
-  { label: 'Summary Gen', href: '/summaries', icon: FileText },
-  { label: 'User Profiles', href: '/admin/profiles', icon: User, adminOnly: true },
+  { label: 'Vertriebs-Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'E-Mail-Generator', href: '/emailgen', icon: Mail },
+  { label: 'Kundensuche', href: '/customers', icon: Search },
+  { label: 'Auswertungen', href: '/analytics', icon: BarChart },
+  { label: 'Gesprächs-Zusammenfassung', href: '/summaries', icon: FileText },
+  { label: 'Benutzerprofile', href: '/admin/profiles', icon: User, adminOnly: true },
 ];
 
 interface UserProfile {
@@ -57,11 +58,6 @@ export default function LeftNavigation() {
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const { theme, setTheme } = useTheme();
   const pathname = usePathname();
-  // const logout = async () => {
-  //   const supabase = createClient();
-  //   await supabase.auth.signOut();
-  //   window.location.href = '/auth/login';
-  // };
 
   // Load collapsed state from localStorage on mount
   useEffect(() => {
@@ -79,12 +75,9 @@ export default function LeftNavigation() {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       
       if (authUser) {
-        // Fetch profile information
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('first_name, last_name, metabase_dashboard_id')
-          .eq('id', authUser.id)
-          .single();
+        // Fetch profile information via server action
+        const profileResult = await fetchCurrentProfile();
+        const profile = profileResult.success ? profileResult.profile : null;
 
         const fullName = profile?.first_name && profile?.last_name
           ? `${profile.first_name} ${profile.last_name}`
@@ -95,9 +88,9 @@ export default function LeftNavigation() {
         setUser({
           email: authUser.email,
           name: fullName,
-          first_name: profile?.first_name,
-          last_name: profile?.last_name,
-          dashboard_id: profile?.metabase_dashboard_id
+          first_name: profile?.first_name || undefined,
+          last_name: profile?.last_name || undefined,
+          dashboard_id: profile?.metabase_dashboard_id || undefined
         });
 
         // Check if user is admin or super_admin
@@ -114,12 +107,8 @@ export default function LeftNavigation() {
       // Listen for auth changes
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
         if (session?.user) {
-          // Fetch profile information
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('first_name, last_name, metabase_dashboard_id')
-            .eq('id', session.user.id)
-            .single();
+          const profileResult = await fetchCurrentProfile();
+          const profile = profileResult.success ? profileResult.profile : null;
 
           const fullName = profile?.first_name && profile?.last_name
             ? `${profile.first_name} ${profile.last_name}`
@@ -130,9 +119,9 @@ export default function LeftNavigation() {
           setUser({
             email: session.user.email,
             name: fullName,
-            first_name: profile?.first_name,
-            last_name: profile?.last_name,
-            dashboard_id: profile?.metabase_dashboard_id
+            first_name: profile?.first_name || undefined,
+            last_name: profile?.last_name || undefined,
+            dashboard_id: profile?.metabase_dashboard_id || undefined
           });
 
           // Check if user is admin or super_admin
@@ -314,19 +303,6 @@ export default function LeftNavigation() {
           )}
           
           {user && (
-            // <button
-            //   className="nav-action-btn nav-action-btn-logout"
-            //   onClick={async () => {
-            //     // const supabase = createClient();
-            //     // await supabase.auth.signOut();
-            //     // window.location.href = '/auth/login';
-            //     logout();
-            //   }}
-            //   title={isCollapsed ? 'Logout' : undefined}
-            // >
-            //   <LogOut className="nav-action-icon" />
-            //   {!isCollapsed && <span className="nav-action-label">Logout</span>}
-            // </button>
             <LogoutButton isCollapsed={isCollapsed} />
           )}
         </div>

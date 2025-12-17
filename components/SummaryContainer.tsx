@@ -29,12 +29,14 @@ export default function SummaryContainer({ initialRole = null }: SummaryContaine
   const [summaryToDelete, setSummaryToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showViewSummaries, setShowViewSummaries] = useState(false);
+  const [userRole, setUserRole] = useState<UserRole | null>(initialRole ?? null);
   
   // Initialize with the role passed from parent (server-side fetch)
   useEffect(() => {
     if (initialRole) {
       const hasAccess = initialRole === 'super_admin' || initialRole === 'admin' || initialRole === 'sales_support';
       setShowViewSummaries(hasAccess);
+      setUserRole(initialRole);
     }
   }, [initialRole]);
 
@@ -51,6 +53,7 @@ export default function SummaryContainer({ initialRole = null }: SummaryContaine
         // Show tab for super_admin, admin, or sales_support
         const hasAccess = role === 'super_admin' || role === 'admin' || role === 'sales_support';
         setShowViewSummaries(hasAccess);
+        setUserRole(role);
       } catch (error) {
         console.error('Error checking view access:', error);
         // Don't override if we have initialRole
@@ -152,6 +155,8 @@ export default function SummaryContainer({ initialRole = null }: SummaryContaine
     setSummaryToDelete(null);
   };
 
+  const canManageSummaries = userRole === 'admin' || userRole === 'super_admin';
+
   if (!isMounted) {
     return (
       <div className="main-container">
@@ -188,6 +193,7 @@ export default function SummaryContainer({ initialRole = null }: SummaryContaine
               onOpenSummaryModal={handleOpenSummaryModal}
               onRequestDelete={handleRequestDelete}
               isDeleting={isDeleting}
+              canDelete={canManageSummaries}
             />
           )}
           {activeTab === 'view-summaries' && showViewSummaries && (
@@ -197,6 +203,7 @@ export default function SummaryContainer({ initialRole = null }: SummaryContaine
               onOpenSummaryModal={handleOpenSummaryModal}
               onRequestDelete={handleRequestDelete}
               isDeleting={isDeleting}
+              canDelete={canManageSummaries}
             />
           )}
         </div>
@@ -212,6 +219,7 @@ export default function SummaryContainer({ initialRole = null }: SummaryContaine
           setHistoryRefreshTrigger(prev => prev + 1);
           showToast('success', 'Summary updated successfully');
         }}
+        canEdit={canManageSummaries}
       />
 
       {/* Delete Confirmation Modal */}
