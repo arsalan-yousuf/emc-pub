@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { RefreshCw } from 'lucide-react';
 
 interface DashboardIframeProps {
@@ -10,11 +10,23 @@ interface DashboardIframeProps {
   refreshDashboardUrl: (dashboardId: number) => Promise<string>;
 }
 
-export default function DashboardIframe({ iframeKey, iframeUrl, dashboardId, refreshDashboardUrl }: DashboardIframeProps) {
+export default function DashboardIframe({ 
+  iframeKey, 
+  iframeUrl, 
+  dashboardId, 
+  refreshDashboardUrl 
+}: DashboardIframeProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  // const [currentUrl, setCurrentUrl] = useState<string | null>(null);
-  const handleRefresh = async () => {
+
+  // Update iframe src when iframeUrl changes
+  useEffect(() => {
+    if (iframeRef.current && iframeUrl) {
+      iframeRef.current.src = iframeUrl;
+    }
+  }, [iframeUrl]);
+
+  const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     
     try {
@@ -23,16 +35,18 @@ export default function DashboardIframe({ iframeKey, iframeUrl, dashboardId, ref
       if (iframeRef.current) {
         iframeRef.current.src = newUrl;
       }
-      // setCurrentUrl(newUrl);
     } catch (error) {
       console.error('Error refreshing dashboard:', error);
+      // Optionally show error to user
     } finally {
       setIsRefreshing(false);
     }
-  };
-// useEffect(() => {
-//   setCurrentUrl(iframeUrl);
-// }, [iframeUrl]);
+  }, [dashboardId, refreshDashboardUrl]);
+
+  if (!iframeUrl) {
+    return null;
+  }
+
   return (
     <div className="w-full h-full relative">
       {/* Refresh Button - positioned relative to container */}
@@ -43,21 +57,21 @@ export default function DashboardIframe({ iframeKey, iframeUrl, dashboardId, ref
           className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-3xl shadow-md hover:shadow-lg transition-all duration-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
           title="Dashboard aktualisieren"
           type="button"
+          aria-label="Dashboard aktualisieren"
         >
           <RefreshCw 
             className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} 
+            aria-hidden="true"
           />
           <span className="text-sm font-medium">Aktualisieren</span>
         </button>
       </div>
 
       {/* Iframe */}
-      {iframeUrl && <iframe
-      // id={iframeKey+'iframe'}
-        key={iframeKey +'iframe'}
+      <iframe
+        key={`${iframeKey}-iframe`}
         ref={iframeRef}
         src={iframeUrl}
-        // src={currentUrl}
         width="100%"
         height="100%"
         style={{ 
@@ -67,7 +81,9 @@ export default function DashboardIframe({ iframeKey, iframeUrl, dashboardId, ref
           display: 'block'
         }}
         className="rounded-lg"
-      />}
+        title="Metabase Dashboard"
+        loading="lazy"
+      />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import NavigationWrapper from "@/components/NavigationWrapper";
+import { UserProvider } from "@/contexts/UserContext";
 import "./globals.css";
 
 const defaultUrl = process.env.VERCEL_URL
@@ -34,12 +35,14 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <div className="app-container">
-            <NavigationWrapper />
-            <main className="main-content">
-              {children}
-            </main>
-          </div>
+          <UserProvider>
+            <div className="app-container">
+              <NavigationWrapper />
+              <main className="main-content">
+                {children}
+              </main>
+            </div>
+          </UserProvider>
         </ThemeProvider>
       </body>
     </html>

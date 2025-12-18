@@ -1,8 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
-import { UserRole } from '@/lib/user-roles';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { X, Loader2 } from 'lucide-react';
+import { UserRole, USER_ROLES } from '@/lib/user-roles';
+
+// ============================================================================
+// Type Definitions
+// ============================================================================
 
 interface Profile {
   id: string;
@@ -13,21 +17,24 @@ interface Profile {
   role: string | null;
 }
 
+interface ProfileFormData {
+  first_name: string;
+  last_name: string;
+  email: string;
+  metabase_dashboard_id: number | null;
+  role: UserRole | null;
+}
+
 interface EditProfileModalProps {
   profile: Profile;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: {
-    first_name: string;
-    last_name: string;
-    email: string;
-    metabase_dashboard_id: number | null;
-    role: UserRole | null;
-  }) => void;
+  onSave: (data: ProfileFormData) => void;
   isSaving: boolean;
   currentUserIsSuperAdmin: boolean;
   isEditingOwnProfile?: boolean;
 }
+
 
 export default function EditProfileModal({
   profile,
@@ -38,66 +45,102 @@ export default function EditProfileModal({
   currentUserIsSuperAdmin,
   isEditingOwnProfile = false
 }: EditProfileModalProps) {
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
-  const [metabaseDashboardId, setMetabaseDashboardId] = useState<string>('');
-  const [role, setRole] = useState<UserRole | null>(null);
+  const [formData, setFormData] = useState<ProfileFormData>({
+    first_name: '',
+    last_name: '',
+    email: '',
+    metabase_dashboard_id: null,
+    role: null,
+  });
 
+  // Initialize form data when profile or modal opens
   useEffect(() => {
     if (profile && isOpen) {
-      setFirstName(profile.first_name || '');
-      setLastName(profile.last_name || '');
-      setEmail(profile.email || '');
-      setMetabaseDashboardId(profile.metabase_dashboard_id?.toString() || '');
-      // Ensure role is properly set - handle both string and UserRole types
-      const profileRole = profile.role;
-      if (profileRole) {
-        // Normalize the role value to match enum values
-        const normalizedRole = String(profileRole).trim();
-        if (['super_admin', 'admin', 'sales_support', 'sales'].includes(normalizedRole)) {
-          setRole(normalizedRole as UserRole);
-        } else {
-          setRole(null);
-        }
-      } else {
-        setRole(null);
-      }
+      const normalizedRole = profile.role 
+        ? (USER_ROLES.includes(profile.role as UserRole) ? (profile.role as UserRole) : null)
+        : null;
+
+      setFormData({
+        first_name: profile.first_name || '',
+        last_name: profile.last_name || '',
+        email: profile.email || '',
+        metabase_dashboard_id: profile.metabase_dashboard_id,
+        role: normalizedRole,
+      });
     }
   }, [profile, isOpen]);
 
-  if (!isOpen) return null;
+  // ============================================================================
+  // Handlers
+  // ============================================================================
 
-  const handleModalBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
+  const updateField = useCallback(<K extends keyof ProfileFormData>(
+    field: K,
+    value: ProfileFormData[K]
+  ) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    return false; // Prevent any form submission
-  };
+  const handleMetabaseIdChange = useCallback((value: string) => {
+    const numValue = value.trim() ? parseInt(value.trim(), 10) : null;
+    updateField('metabase_dashboard_id', isNaN(numValue as number) ? null : numValue);
+  }, [updateField]);
 
-  const handleSave = (e?: React.MouseEvent) => {
+  const handleRoleChange = useCallback((value: string) => {
+    updateField('role', value ? (value as UserRole) : null);
+  }, [updateField]);
+
+  const handleSave = useCallback((e?: React.MouseEvent) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
     
-    // Always call onSave which will show confirmation modal
-    // The actual save happens after confirmation
     onSave({
-      first_name: firstName.trim(),
-      last_name: lastName.trim(),
-      email: email.trim(),
-      metabase_dashboard_id: metabaseDashboardId.trim() ? parseInt(metabaseDashboardId.trim()) : null,
-      role: role
+      first_name: formData.first_name.trim(),
+      last_name: formData.last_name.trim(),
+      email: formData.email.trim(),
+      metabase_dashboard_id: formData.metabase_dashboard_id,
+      role: formData.role,
     });
-    // Explicitly return false to prevent any form submission
+  }, [formData, onSave]);
+
+  const roleOptions = useMemo(() => {
+    const options = [
+      { value: '', label: 'Keine Rolle' },
+      { value: 'sales', label: 'Verkauf' },
+      { value: 'sales_support', label: 'Verkaufsunterstützung' },
+    ];
+
+    if (currentUserIsSuperAdmin) {
+      options.push(
+        { value: 'admin', label: 'Admin' },
+        { value: 'super_admin', label: 'Super Admin' }
+      );
+    }
+
+    return options;
+  }, [currentUserIsSuperAdmin]);
+
+  const roleHelpText = useMemo(() => {
+    if (isEditingOwnProfile) return 'You cannot change your own role';
+    if (currentUserIsSuperAdmin) return 'You can assign any role';
+    return 'You can only assign Sales or Sales Support roles';
+  }, [isEditingOwnProfile, currentUserIsSuperAdmin]);
+
+  const handleModalBackdropClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  }, [onClose]);
+
+  const handleSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     return false;
-  };
+  }, []);
+
+  if (!isOpen) return null;
 
   return (
     <div className="settings-modal" onClick={handleModalBackdropClick}>
@@ -141,8 +184,8 @@ export default function EditProfileModal({
                 </label>
                 <input
                   type="text"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
+                  value={formData.first_name}
+                  onChange={(e) => updateField('first_name', e.target.value)}
                   required
                   disabled={isSaving}
                   style={{
@@ -163,8 +206,8 @@ export default function EditProfileModal({
                 </label>
                 <input
                   type="text"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
+                  value={formData.last_name}
+                  onChange={(e) => updateField('last_name', e.target.value)}
                   required
                   disabled={isSaving}
                   style={{
@@ -185,8 +228,8 @@ export default function EditProfileModal({
                 </label>
                 <input
                   type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={formData.email}
+                  onChange={(e) => updateField('email', e.target.value)}
                   required
                   disabled={isSaving}
                   style={{
@@ -207,8 +250,8 @@ export default function EditProfileModal({
                 </label>
                 <input
                   type="number"
-                  value={metabaseDashboardId}
-                  onChange={(e) => setMetabaseDashboardId(e.target.value)}
+                  value={formData.metabase_dashboard_id?.toString() || ''}
+                  onChange={(e) => handleMetabaseIdChange(e.target.value)}
                   disabled={isSaving}
                   placeholder="Optional"
                   style={{
@@ -231,12 +274,9 @@ export default function EditProfileModal({
                   Rolle
                 </label>
                 <select
-                  key={`role-select-${profile.id}-${role || 'none'}`}
-                  value={role || ''}
-                  onChange={(e) => {
-                    const selectedValue = e.target.value;
-                    setRole(selectedValue ? (selectedValue as UserRole) : null);
-                  }}
+                  key={`role-select-${profile.id}-${formData.role || 'none'}`}
+                  value={formData.role || ''}
+                  onChange={(e) => handleRoleChange(e.target.value)}
                   disabled={isSaving || isEditingOwnProfile}
                   style={{
                     padding: '10px 12px',
@@ -250,22 +290,14 @@ export default function EditProfileModal({
                     opacity: isEditingOwnProfile ? 0.6 : 1
                   }}
                 >
-                  <option value="">Keine Rolle</option>
-                  <option value="sales">Verkauf</option>
-                  <option value="sales_support">Verkaufsunterstützung</option>
-                  {currentUserIsSuperAdmin && (
-                    <>
-                      <option value="admin" key="admin">Admin</option>
-                      <option value="super_admin">Super Admin</option>
-                    </>
-                  )}
+                  {roleOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
                 <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>
-                  {isEditingOwnProfile 
-                    ? 'You cannot change your own role' 
-                    : currentUserIsSuperAdmin 
-                    ? 'You can assign any role' 
-                    : 'You can only assign Sales or Sales Support roles'}
+                  {roleHelpText}
                 </p>
               </div>
 
@@ -305,22 +337,43 @@ export default function EditProfileModal({
                 disabled={isSaving}
                 onClick={handleSave}
                 style={{
-                  background: isSaving 
-                    ? 'var(--muted)' 
-                    : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                   color: 'white',
                   border: 'none',
-                  minWidth: '100px',
+                  minWidth: '140px',
                   padding: '10px 20px',
                   borderRadius: '8px',
                   cursor: isSaving ? 'not-allowed' : 'pointer',
                   fontSize: '14px',
                   fontWeight: '500',
                   transition: 'all 0.2s',
-                  opacity: isSaving ? 0.6 : 1
+                  opacity: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  position: 'relative',
+                  pointerEvents: isSaving ? 'none' : 'auto'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSaving) {
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
                 }}
               >
-                {isSaving ? 'Wird gespeichert...' : 'Änderungen speichern'}
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" style={{ flexShrink: 0 }} />
+                    <span>Wird gespeichert...</span>
+                  </>
+                ) : (
+                  <span>Änderungen speichern</span>
+                )}
               </button>
             </div>
           </form>

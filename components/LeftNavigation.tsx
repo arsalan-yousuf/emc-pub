@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
-import { createClient } from '@/lib/supabase/client';
 import { LogoutButton } from './logout-button';
 import { 
   LayoutDashboard, 
@@ -15,15 +14,17 @@ import {
   ChevronLeft,
   ChevronRight,
   User,
-  LogOut,
   Sun,
   Moon,
   Laptop
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { isAdmin, getUserRole, isSuperAdmin } from '@/lib/user-roles';
-import { fetchCurrentProfile } from '@/lib/profiles-server';
+import { useUser } from '@/contexts/UserContext';
 import type { UserRole } from '@/lib/user-roles';
+
+// ============================================================================
+// Type Definitions
+// ============================================================================
 
 interface NavItem {
   label: string;
@@ -32,7 +33,12 @@ interface NavItem {
   adminOnly?: boolean;
 }
 
-const navItems: NavItem[] = [
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const NAV_ITEMS: NavItem[] = [
   { label: 'Vertriebs-Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'E-Mail-Generator', href: '/emailgen', icon: Mail },
   { label: 'Kundensuche', href: '/customers', icon: Search },
@@ -41,120 +47,96 @@ const navItems: NavItem[] = [
   { label: 'Benutzerprofile', href: '/admin/profiles', icon: User, adminOnly: true },
 ];
 
-interface UserProfile {
-  email?: string;
-  name?: string;
-  first_name?: string;
-  last_name?: string;
-  dashboard_id?: number;
-}
+const PUBLIC_ROUTES = ['/emailgen', '/customers', '/analytics'];
+const THEMES = ['light', 'dark', 'system'] as const;
+const STORAGE_KEY_COLLAPSED = 'nav-collapsed';
 
 export default function LeftNavigation() {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [user, setUser] = useState<UserProfile | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [isUserAdmin, setIsUserAdmin] = useState(false);
-  const [isUserSuperAdmin, setIsUserSuperAdmin] = useState(false);
-  const [userRole, setUserRole] = useState<UserRole | null>(null);
   const { theme, setTheme } = useTheme();
   const pathname = usePathname();
+  
+  // Get user data from context (fetched after login)
+  const { profile, isAdmin, isSuperAdmin, role, isLoading } = useUser();
+
+  // ============================================================================
+  // Effects
+  // ============================================================================
 
   // Load collapsed state from localStorage on mount
   useEffect(() => {
-    const savedState = localStorage.getItem('nav-collapsed');
+    const savedState = localStorage.getItem(STORAGE_KEY_COLLAPSED);
     if (savedState !== null) {
       setIsCollapsed(savedState === 'true');
     }
     setMounted(true);
   }, []);
 
-  // Fetch user data and check admin status
-  useEffect(() => {
-    const fetchUser = async () => {
-      const supabase = createClient();
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      
-      if (authUser) {
-        // Fetch profile information via server action
-        const profileResult = await fetchCurrentProfile();
-        const profile = profileResult.success ? profileResult.profile : null;
+  // ============================================================================
+  // Event Handlers
+  // ============================================================================
 
-        const fullName = profile?.first_name && profile?.last_name
-          ? `${profile.first_name} ${profile.last_name}`
-          : profile?.first_name || profile?.last_name
-          ? profile.first_name || profile.last_name
-          : authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.email?.split('@')[0];
-
-        setUser({
-          email: authUser.email,
-          name: fullName,
-          first_name: profile?.first_name || undefined,
-          last_name: profile?.last_name || undefined,
-          dashboard_id: profile?.metabase_dashboard_id || undefined
-        });
-
-        // Check if user is admin or super_admin
-        const adminStatus = await isAdmin();
-        setIsUserAdmin(adminStatus);
-        const superAdminStatus = await isSuperAdmin();
-        setIsUserSuperAdmin(superAdminStatus);
-        
-        // Get user role
-        const role = await getUserRole(authUser.id);
-        setUserRole(role);
-      }
-
-      // Listen for auth changes
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-        if (session?.user) {
-          const profileResult = await fetchCurrentProfile();
-          const profile = profileResult.success ? profileResult.profile : null;
-
-          const fullName = profile?.first_name && profile?.last_name
-            ? `${profile.first_name} ${profile.last_name}`
-            : profile?.first_name || profile?.last_name
-            ? profile.first_name || profile.last_name
-            : session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0];
-
-          setUser({
-            email: session.user.email,
-            name: fullName,
-            first_name: profile?.first_name || undefined,
-            last_name: profile?.last_name || undefined,
-            dashboard_id: profile?.metabase_dashboard_id || undefined
-          });
-
-          // Check if user is admin or super_admin
-          const adminStatus = await isAdmin();
-          setIsUserAdmin(adminStatus);
-          const superAdminStatus = await isSuperAdmin();
-          setIsUserSuperAdmin(superAdminStatus);
-          
-          // Get user role
-          const role = await getUserRole(session.user.id);
-          setUserRole(role);
-        } else {
-          setUser(null);
-          setIsUserAdmin(false);
-          setIsUserSuperAdmin(false);
-          setUserRole(null);
-        }
-      });
-
-      return () => {
-        subscription.unsubscribe();
-      };
-    };
-
-    fetchUser();
-  }, []);
-
-  // Save collapsed state to localStorage
-  const toggleCollapse = () => {
+  const toggleCollapse = useCallback(() => {
     const newState = !isCollapsed;
     setIsCollapsed(newState);
-    localStorage.setItem('nav-collapsed', String(newState));
-  };
+    localStorage.setItem(STORAGE_KEY_COLLAPSED, String(newState));
+  }, [isCollapsed]);
+
+  const handleThemeToggle = useCallback(() => {
+    const currentIndex = THEMES.indexOf((theme as typeof THEMES[number]) || 'system');
+    const nextIndex = (currentIndex + 1) % THEMES.length;
+    setTheme(THEMES[nextIndex]);
+  }, [theme, setTheme]);
+
+  // ============================================================================
+  // Computed Values
+  // ============================================================================
+
+  const visibleNavItems = useMemo(() => {
+    return NAV_ITEMS.filter(item => {
+      // Public routes are always visible immediately
+      if (PUBLIC_ROUTES.includes(item.href)) {
+        return true;
+      }
+      
+      // Admin-only items: show if admin, hide if not admin and check is complete
+      if (item.adminOnly) {
+        // If still loading, hide admin items (prevents flash)
+        if (isLoading) {
+          return false;
+        }
+        // Show if admin, hide if not
+        return isAdmin || isSuperAdmin;
+      }
+      
+      // Non-public, non-admin items: show if user has role or is admin
+      // Show immediately if we have a role, or wait for check to complete
+      if (role) {
+        return true;
+      }
+      
+      // If still loading, show item optimistically (non-admin items)
+      // This allows non-admin navigation to appear immediately
+      if (isLoading) {
+        return true;
+      }
+      
+      // After check completes, admins can see all items
+      if (isAdmin || isSuperAdmin) {
+        return true;
+      }
+      
+      // Non-admins without role cannot see non-public items
+      return false;
+    });
+  }, [isAdmin, isSuperAdmin, role, isLoading]);
+
+  const themeIcon = useMemo(() => {
+    if (theme === 'light') return Sun;
+    if (theme === 'dark') return Moon;
+    return Laptop;
+  }, [theme]);
 
   return (
     <nav 
@@ -188,57 +170,7 @@ export default function LeftNavigation() {
 
         {/* Navigation Items */}
         <ul className="nav-list">
-          {navItems.map((item) => {
-            // Routes accessible to users with no role
-            const publicRoutes = ['/emailgen', '/customers', '/analytics'];
-            const isPublicRoute = publicRoutes.includes(item.href);
-            
-            // Email Gen, Customer Search, and Analytics are always visible
-            if (isPublicRoute) {
-              const Icon = item.icon;
-              const isActive = pathname === item.href;
-              return (
-                <li key={item.href} className="nav-item">
-                  <Link
-                    href={item.href}
-                    className={`nav-link ${isActive ? 'active' : ''}`}
-                    title={isCollapsed ? item.label : undefined}
-                  >
-                    <Icon className="nav-icon" />
-                    {!isCollapsed && <span className="nav-label">{item.label}</span>}
-                  </Link>
-                </li>
-              );
-            }
-            
-            // Hide admin-only items if user is not admin or super_admin
-            if (item.adminOnly && !isUserAdmin) {
-              return null;
-            }
-            
-            // Admins and super_admins can view all screens
-            if (isUserAdmin || isUserSuperAdmin) {
-              const Icon = item.icon;
-              const isActive = pathname === item.href;
-              return (
-                <li key={item.href} className="nav-item">
-                  <Link
-                    href={item.href}
-                    className={`nav-link ${isActive ? 'active' : ''}`}
-                    title={isCollapsed ? item.label : undefined}
-                  >
-                    <Icon className="nav-icon" />
-                    {!isCollapsed && <span className="nav-label">{item.label}</span>}
-                  </Link>
-                </li>
-              );
-            }
-            
-            // For non-admins: Hide all other items if user has no role
-            if (!userRole) {
-              return null;
-            }
-
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
             
@@ -258,19 +190,19 @@ export default function LeftNavigation() {
         </ul>
 
         {/* User Info */}
-        {user && (
+        {profile && (
           <div className="nav-user">
             <div className="nav-user-avatar">
               <User className="nav-user-icon" />
             </div>
             {!isCollapsed && (
               <div className="nav-user-info">
-                <div className="nav-user-name" title={user.email}>
-                  {user.name || user.email?.split('@')[0] || 'Benutzer'}
+                <div className="nav-user-name" title={profile.email}>
+                  {profile.name || profile.email?.split('@')[0] || 'Benutzer'}
                 </div>
-                {user.email && user.name && (
-                  <div className="nav-user-email" title={user.email}>
-                    {user.email}
+                {profile.email && profile.name && (
+                  <div className="nav-user-email" title={profile.email}>
+                    {profile.email}
                   </div>
                 )}
               </div>
@@ -283,26 +215,16 @@ export default function LeftNavigation() {
           {mounted && (
             <button
               className="nav-action-btn"
-              onClick={() => {
-                const themes = ['light', 'dark', 'system'];
-                const currentIndex = themes.indexOf(theme || 'system');
-                const nextIndex = (currentIndex + 1) % themes.length;
-                setTheme(themes[nextIndex]);
-              }}
+              onClick={handleThemeToggle}
               title={isCollapsed ? `Design: ${theme || 'system'}` : undefined}
+              aria-label={`Design wechseln zu ${theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light'}`}
             >
-              {theme === 'light' ? (
-                <Sun className="nav-action-icon" />
-              ) : theme === 'dark' ? (
-                <Moon className="nav-action-icon" />
-              ) : (
-                <Laptop className="nav-action-icon" />
-              )}
+              {React.createElement(themeIcon, { className: 'nav-action-icon' })}
               {!isCollapsed && <span className="nav-action-label">Design</span>}
             </button>
           )}
           
-          {user && (
+          {profile && (
             <LogoutButton isCollapsed={isCollapsed} />
           )}
         </div>

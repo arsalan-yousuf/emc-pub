@@ -1,39 +1,125 @@
 import { createClient as createBrowserClient } from '@/lib/supabase/client';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 
+// ============================================================================
+// Type Definitions
+// ============================================================================
+
 export type UserRole = 'super_admin' | 'admin' | 'sales_support' | 'sales';
 
+export const USER_ROLES: readonly UserRole[] = ['super_admin', 'admin', 'sales_support', 'sales'] as const;
+
+export interface RoleResult {
+  success: boolean;
+  error?: string;
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
 /**
- * Get the current user's roles
+ * Validates if a string is a valid UserRole
  */
-export async function getUserRoles(): Promise<UserRole[]> {
+function isValidRole(role: string): role is UserRole {
+  return USER_ROLES.includes(role as UserRole);
+}
+
+/**
+ * Maps database role results to UserRole array
+ */
+function mapRolesToUserRoles(data: Array<{ role: string }> | null): UserRole[] {
+  if (!data) return [];
+  return data
+    .map(item => item.role)
+    .filter(isValidRole);
+}
+
+// ============================================================================
+// Client-Side Role Functions
+// ============================================================================
+
+/**
+ * Get the current user's roles with timeout protection
+ * @param timeoutMs - Timeout in milliseconds (default: 5000ms)
+ * @returns Array of user roles, empty array if user not authenticated or error occurs
+ */
+export async function getUserRoles(timeoutMs: number = 10000): Promise<UserRole[]> {
   try {
     const supabase = createBrowserClient();
-    const { data: { user } } = await supabase.auth.getUser();
     
-    if (!user) {
+    // Create timeout promise
+    const createTimeout = () => new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('getUserRoles: Request timed out'));
+      }, timeoutMs);
+    });
+
+    // Race between getUser and timeout
+    const getUserPromise = supabase.auth.getUser();
+    let getUserResult;
+    try {
+      getUserResult = await Promise.race([
+        getUserPromise,
+        createTimeout(),
+      ]);
+    } catch (timeoutError) {
+      if (timeoutError instanceof Error && timeoutError.message.includes('timed out')) {
+        console.warn('getUserRoles: Auth check timed out after', timeoutMs, 'ms');
+        return [];
+      }
+      throw timeoutError;
+    }
+    
+    const { data: { user }, error: authError } = getUserResult;
+    
+    if (authError || !user) {
       return [];
     }
 
-    const { data, error } = await supabase
+    // Race between role query and timeout
+    const roleQueryPromise = supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id);
+
+    let roleQueryResult;
+    try {
+      roleQueryResult = await Promise.race([
+        roleQueryPromise,
+        createTimeout(),
+      ]);
+    } catch (timeoutError) {
+      if (timeoutError instanceof Error && timeoutError.message.includes('timed out')) {
+        console.warn('getUserRoles: Role query timed out after', timeoutMs, 'ms');
+        return [];
+      }
+      throw timeoutError;
+    }
+
+    const { data, error } = roleQueryResult;
 
     if (error) {
       console.error('Error fetching user roles:', error);
       return [];
     }
 
-    return (data || []).map((item: { role: string }) => item.role as UserRole);
+    return mapRolesToUserRoles(data);
   } catch (error) {
-    console.error('Error getting user roles:', error);
+    // Handle timeout or other errors
+    if (error instanceof Error && error.message.includes('timed out')) {
+      console.warn('getUserRoles: Request timed out after', timeoutMs, 'ms');
+    } else {
+      console.error('Error getting user roles:', error);
+    }
     return [];
   }
 }
 
 /**
  * Check if the current user has a specific role
+ * @param role - The role to check for
+ * @returns True if user has the role, false otherwise
  */
 export async function hasRole(role: UserRole): Promise<boolean> {
   const roles = await getUserRoles();
@@ -42,6 +128,7 @@ export async function hasRole(role: UserRole): Promise<boolean> {
 
 /**
  * Check if the current user is admin or super_admin
+ * @returns True if user is admin or super_admin, false otherwise
  */
 export async function isAdmin(): Promise<boolean> {
   const roles = await getUserRoles();
@@ -50,6 +137,7 @@ export async function isAdmin(): Promise<boolean> {
 
 /**
  * Check if the current user is super_admin
+ * @returns True if user is super_admin, false otherwise
  */
 export async function isSuperAdmin(): Promise<boolean> {
   const roles = await getUserRoles();
@@ -59,19 +147,19 @@ export async function isSuperAdmin(): Promise<boolean> {
 /**
  * Get a user's role (single role - first one found)
  * Works in both client and server contexts
+ * @param userId - The user ID to get the role for
+ * @param useServerClient - Whether to use server client (default: false)
+ * @returns The user's role or null if not found or error occurs
  */
 export async function getUserRole(userId: string, useServerClient: boolean = false): Promise<UserRole | null> {
   try {
-    // Use server client if specified (for server actions) or try to detect
     const supabase = useServerClient 
       ? await createServerClient()
       : createBrowserClient();
     
-    // First, get the current user to check if we're querying our own role
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     
-    // If querying own role, use direct query (allowed by RLS)
-    // If querying another user's role, we need to be admin/super_admin (also allowed by RLS)
+    // Try direct query first
     const { data, error } = await supabase
       .from('user_roles')
       .select('role')
@@ -79,47 +167,16 @@ export async function getUserRole(userId: string, useServerClient: boolean = fal
       .limit(1)
       .maybeSingle();
     
-    if (error) {
-      console.error('Error getting user role - details:', {
-        errorCode: error.code,
-        errorMessage: error.message,
-        errorDetails: error.details,
-        errorHint: error.hint,
-        userId,
-        currentUserId: currentUser?.id,
-        isQueryingOwnRole: currentUser?.id === userId
-      });
-      
-      // If 406 error (RLS policy issue), try alternative approach using RPC
-      if (error.code === 'PGRST116' || error.message?.includes('406') || error.code === '42501') {
-        console.warn('Direct user_roles access blocked by RLS, trying RPC function');
-        
-        // Try using user_has_role RPC for each role type
-        const roles: UserRole[] = ['super_admin', 'admin', 'sales_support', 'sales'];
-        for (const role of roles) {
-          try {
-            const { data: hasRole } = await supabase.rpc('user_has_role', {
-              p_user: userId,
-              p_role: role
-            });
-            if (hasRole === true) {
-              return role;
-            }
-          } catch (rpcError) {
-            // Continue to next role
-            continue;
-          }
-        }
-        return null;
-      }
-      return null;
+    if (!error && data?.role && isValidRole(data.role)) {
+      return data.role;
     }
 
-    if (!data) {
-      return null;
+    // If RLS blocks direct access, try RPC function as fallback
+    if (error && (error.code === 'PGRST116' || error.message?.includes('406') || error.code === '42501')) {
+      return await getUserRoleViaRPC(supabase, userId);
     }
 
-    return data.role as UserRole;
+    return null;
   } catch (error) {
     console.error('Error getting user role:', error);
     return null;
@@ -127,9 +184,40 @@ export async function getUserRole(userId: string, useServerClient: boolean = fal
 }
 
 /**
- * Grant a role to a user (calls the database function)
+ * Fallback method to get user role via RPC function
+ * @param supabase - Supabase client instance
+ * @param userId - The user ID to get the role for
+ * @returns The user's role or null if not found
  */
-export async function grantRoleToUser(userId: string, role: UserRole): Promise<{ success: boolean; error?: string }> {
+async function getUserRoleViaRPC(
+  supabase: Awaited<ReturnType<typeof createServerClient>> | ReturnType<typeof createBrowserClient>,
+  userId: string
+): Promise<UserRole | null> {
+  for (const role of USER_ROLES) {
+    try {
+      const { data: hasRole, error: rpcError } = await supabase.rpc('user_has_role', {
+        p_user: userId,
+        p_role: role
+      });
+      
+      if (!rpcError && hasRole === true) {
+        return role;
+      }
+    } catch (rpcError) {
+      // Continue to next role
+      continue;
+    }
+  }
+  return null;
+}
+
+/**
+ * Grant a role to a user (calls the database function)
+ * @param userId - The user ID to grant the role to
+ * @param role - The role to grant
+ * @returns Success status and error message if any
+ */
+export async function grantRoleToUser(userId: string, role: UserRole): Promise<RoleResult> {
   try {
     const supabase = createBrowserClient();
     const { error } = await supabase.rpc('grant_role', {
@@ -139,28 +227,44 @@ export async function grantRoleToUser(userId: string, role: UserRole): Promise<{
 
     if (error) {
       // If the error is about duplicate key, the role already exists - that's okay
-      if (error.message?.includes('duplicate key') || error.message?.includes('already exists') || error.code === '23505') {
-        console.log(`Role ${role} already exists for user ${userId}, skipping`);
+      if (isDuplicateKeyError(error)) {
         return { success: true };
       }
+      console.error('Error granting role:', error);
       return { success: false, error: error.message };
     }
 
     return { success: true };
   } catch (error) {
     console.error('Error granting role:', error);
-    // Handle duplicate key error in catch block too
-    if (error instanceof Error && (error.message.includes('duplicate key') || error.message.includes('already exists'))) {
+    if (error instanceof Error && isDuplicateKeyError(error)) {
       return { success: true };
     }
-    return { success: false, error: error instanceof Error ? error.message : 'Failed to grant role' };
+    const errorMessage = error instanceof Error ? error.message : 'Failed to grant role';
+    return { success: false, error: errorMessage };
   }
 }
 
 /**
- * Revoke a role from a user (calls the database function)
+ * Check if an error is a duplicate key error
  */
-export async function revokeRoleFromUser(userId: string, role: UserRole): Promise<{ success: boolean; error?: string }> {
+function isDuplicateKeyError(error: { message?: string; code?: string } | Error): boolean {
+  const message = error instanceof Error ? error.message : error.message || '';
+  const code = 'code' in error ? error.code : undefined;
+  return (
+    message.includes('duplicate key') ||
+    message.includes('already exists') ||
+    code === '23505'
+  );
+}
+
+/**
+ * Revoke a role from a user (calls the database function)
+ * @param userId - The user ID to revoke the role from
+ * @param role - The role to revoke
+ * @returns Success status and error message if any
+ */
+export async function revokeRoleFromUser(userId: string, role: UserRole): Promise<RoleResult> {
   try {
     const supabase = createBrowserClient();
     const { error } = await supabase.rpc('revoke_role', {
@@ -169,13 +273,15 @@ export async function revokeRoleFromUser(userId: string, role: UserRole): Promis
     });
 
     if (error) {
+      console.error('Error revoking role:', error);
       return { success: false, error: error.message };
     }
 
     return { success: true };
   } catch (error) {
     console.error('Error revoking role:', error);
-    return { success: false, error: error instanceof Error ? error.message : 'Failed to revoke role' };
+    const errorMessage = error instanceof Error ? error.message : 'Failed to revoke role';
+    return { success: false, error: errorMessage };
   }
 }
 

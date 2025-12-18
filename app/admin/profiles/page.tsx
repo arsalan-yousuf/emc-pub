@@ -1,62 +1,155 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { isAdmin, isSuperAdmin, grantRoleToUser, revokeRoleFromUser, type UserRole } from '@/lib/user-roles';
-import { fetchProfiles, type ProfileWithRole, deleteUserAccount, updateUserProfile } from '@/lib/profiles-server';
+import { fetchProfiles, type ProfileWithRole, deleteUserAccount, updateUserProfile, type UpdateProfileData } from '@/lib/profiles-server';
 import { useRouter } from 'next/navigation';
-import { Edit2, Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, User, Shield } from 'lucide-react';
+import { Edit2, Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import EditProfileModal from '@/components/admin/EditProfileModal';
 import DeleteConfirmationModal from '@/components/summaries/DeleteConfirmationModal';
 
+// ============================================================================
+// Type Definitions
+// ============================================================================
 
 type SortField = 'first_name' | 'last_name' | 'email' | 'created_at';
 type SortDirection = 'asc' | 'desc';
 
+interface ProfileUpdateData extends UpdateProfileData {
+  role: UserRole | null;
+}
+
+interface AppState {
+  profiles: ProfileWithRole[];
+  filteredProfiles: ProfileWithRole[];
+  searchQuery: string;
+  sortField: SortField;
+  sortDirection: SortDirection;
+  currentPage: number;
+}
+
+interface UserState {
+  isAuthorized: boolean;
+  isSuperAdmin: boolean;
+  userId: string | null;
+}
+
+interface ModalState {
+  editingProfile: ProfileWithRole | null;
+  deletingUserId: string | null;
+  isDeleteModalOpen: boolean;
+  userToDelete: ProfileWithRole | null;
+}
+
+const ITEMS_PER_PAGE = 10;
+const ERROR_DISPLAY_DURATION = 5000;
+const SUCCESS_DISPLAY_DURATION = 3000;
+
 export default function AdminProfilesPage() {
   const router = useRouter();
-  const [profiles, setProfiles] = useState<ProfileWithRole[]>([]);
-  const [filteredProfiles, setFilteredProfiles] = useState<ProfileWithRole[]>([]);
+  const isLoadingRef = useRef(false);
+
+  // State management
+  const [appState, setAppState] = useState<AppState>({
+    profiles: [],
+    filteredProfiles: [],
+    searchQuery: '',
+    sortField: 'created_at',
+    sortDirection: 'desc',
+    currentPage: 1,
+  });
+
+  const [userState, setUserState] = useState<UserState>({
+    isAuthorized: false,
+    isSuperAdmin: false,
+    userId: null,
+  });
+
+  const [modalState, setModalState] = useState<ModalState>({
+    editingProfile: null,
+    deletingUserId: null,
+    isDeleteModalOpen: false,
+    userToDelete: null,
+  });
+
   const [isLoading, setIsLoading] = useState(true);
-  const [isAuthorized, setIsAuthorized] = useState(false);
-  const [currentUserIsSuperAdmin, setCurrentUserIsSuperAdmin] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortField, setSortField] = useState<SortField>('created_at');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [editingProfile, setEditingProfile] = useState<ProfileWithRole | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [userToDelete, setUserToDelete] = useState<ProfileWithRole | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const isLoadingRef = useRef(false);
 
-  const itemsPerPage = 10;
+  // ============================================================================
+  // Helper Functions
+  // ============================================================================
 
-  // Check authorization and load profiles
-  useEffect(() => {
-    const checkAuthAndLoad = async () => {
-      const admin = await isAdmin();
-      if (!admin) {
-        router.push('/dashboard');
-        return;
+  const showError = useCallback((message: string, duration: number = ERROR_DISPLAY_DURATION) => {
+    setError(message);
+    setTimeout(() => setError(null), duration);
+  }, []);
+
+  const showSuccess = useCallback((message: string, duration: number = SUCCESS_DISPLAY_DURATION) => {
+    setSuccess(message);
+    setTimeout(() => setSuccess(null), duration);
+  }, []);
+
+  const canEditProfile = useCallback((profile: ProfileWithRole): boolean => {
+    if (userState.isSuperAdmin) return true;
+    if (userState.userId && profile.id === userState.userId) return true;
+    if (profile.role === 'admin' || profile.role === 'super_admin') return false;
+    return true;
+  }, [userState.isSuperAdmin, userState.userId]);
+
+  const handleRoleChange = useCallback(async (
+    profileId: string,
+    currentRole: UserRole | null,
+    newRole: UserRole | null
+  ): Promise<void> => {
+    if (currentRole === newRole) return;
+
+    // Case 1: Assigning "No Role" - only revoke existing role
+    if (!newRole && currentRole) {
+      const revokeResult = await revokeRoleFromUser(profileId, currentRole);
+      if (!revokeResult.success) {
+        const errorMsg = revokeResult.error || '';
+        if (!errorMsg.includes('not found') && !errorMsg.includes('does not exist')) {
+          throw new Error(errorMsg || 'Rolle konnte nicht entzogen werden');
+        }
       }
-      setIsAuthorized(true);
-      const superAdmin = await isSuperAdmin();
-      setCurrentUserIsSuperAdmin(superAdmin);
-      
-      loadProfiles();
-    };
-    checkAuthAndLoad();
-  }, [router]);
+      return;
+    }
 
-  // Load profiles using server action
-  const loadProfiles = async () => {
+    // Case 2: Assigning role from "No Role" - only grant new role
+    if (newRole && !currentRole) {
+      const grantResult = await grantRoleToUser(profileId, newRole);
+      if (!grantResult.success) {
+        throw new Error(grantResult.error || 'Rolle konnte nicht zugewiesen werden');
+      }
+      return;
+    }
+
+    // Case 3: Changing from one role to another - revoke old and grant new
+    if (currentRole && newRole) {
+      const revokeResult = await revokeRoleFromUser(profileId, currentRole);
+      if (!revokeResult.success) {
+        const errorMsg = revokeResult.error || '';
+        if (!errorMsg.includes('not found') && !errorMsg.includes('does not exist')) {
+          throw new Error(errorMsg || 'Rolle konnte nicht entzogen werden');
+        }
+      }
+      const grantResult = await grantRoleToUser(profileId, newRole);
+      if (!grantResult.success) {
+        throw new Error(grantResult.error || 'Rolle konnte nicht zugewiesen werden');
+      }
+    }
+  }, []);
+
+  // ============================================================================
+  // Data Loading
+  // ============================================================================
+
+  const loadProfiles = useCallback(async () => {
     if (isLoadingRef.current) return;
     isLoadingRef.current = true;
+    
     try {
       setIsLoading(true);
       setError(null);
@@ -67,19 +160,14 @@ export default function AdminProfilesPage() {
         throw new Error(result.error || 'Profile konnten nicht geladen werden');
       }
 
-      if (result.data) {
-        setProfiles(result.data);
-      } else {
-        setProfiles([]);
-      }
-
-      // Set current user ID and super admin status from server response
-      if (result.currentUserId) {
-        setCurrentUserId(result.currentUserId);
-      }
-      if (result.isSuperAdmin !== undefined) {
-        setCurrentUserIsSuperAdmin(result.isSuperAdmin);
-      }
+      const profilesData = result.data || [];
+      
+      setAppState(prev => ({ ...prev, profiles: profilesData }));
+      setUserState(prev => ({
+        ...prev,
+        userId: result.currentUserId || null,
+        isSuperAdmin: result.isSuperAdmin || false,
+      }));
     } catch (err) {
       console.error('Error loading profiles:', err);
       const errorMessage = err instanceof Error 
@@ -92,26 +180,101 @@ export default function AdminProfilesPage() {
       setIsLoading(false);
       isLoadingRef.current = false;
     }
-  };
+  }, []);
+
+  // ============================================================================
+  // Effects
+  // ============================================================================
+
+  // Check authorization and load profiles on mount
+  useEffect(() => {
+    let isMounted = true;
+    let timeoutId: NodeJS.Timeout | null = null;
+
+    const checkAuthAndLoad = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // Add timeout to prevent infinite loading
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(new Error('Authorization check timed out. Please refresh the page.'));
+          }, 10000); // 10 second timeout
+        });
+
+        // Race between authorization check and timeout
+        const admin = await Promise.race([
+          isAdmin(),
+          timeoutPromise,
+        ]);
+
+        if (!isMounted) return;
+
+        if (!admin) {
+          router.push('/dashboard');
+          return;
+        }
+        
+        setUserState(prev => ({ ...prev, isAuthorized: true }));
+        
+        // Check super admin status with timeout
+        const superAdmin = await Promise.race([
+          isSuperAdmin(),
+          timeoutPromise,
+        ]);
+
+        if (!isMounted) return;
+
+        setUserState(prev => ({ ...prev, isSuperAdmin: superAdmin }));
+        
+        // Load profiles
+        await loadProfiles();
+      } catch (err) {
+        if (!isMounted) return;
+
+        console.error('Error in authorization check:', err);
+        const errorMessage = err instanceof Error 
+          ? err.message 
+          : 'Fehler bei der Autorisierung. Bitte die Seite aktualisieren.';
+        setError(errorMessage);
+        setIsLoading(false);
+      } finally {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+      }
+    };
+
+    checkAuthAndLoad();
+
+    return () => {
+      isMounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadProfiles]);
 
   // Refresh on window focus to ensure data is fresh when navigating back to this tab
   useEffect(() => {
+    if (!userState.isAuthorized) return;
+    
     const handleFocus = () => {
-      if (isAuthorized) {
-        loadProfiles();
-      }
+      loadProfiles();
     };
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
-  }, [isAuthorized]);
+  }, [userState.isAuthorized, loadProfiles]);
 
   // Filter and sort profiles
-  useEffect(() => {
-    let filtered = [...profiles];
+  const filteredAndSortedProfiles = useMemo(() => {
+    let filtered = [...appState.profiles];
 
     // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
+    if (appState.searchQuery.trim()) {
+      const query = appState.searchQuery.toLowerCase();
       filtered = filtered.filter(profile => {
         const firstName = profile.first_name?.toLowerCase() || '';
         const lastName = profile.last_name?.toLowerCase() || '';
@@ -126,7 +289,7 @@ export default function AdminProfilesPage() {
       let aValue: string | number | null = null;
       let bValue: string | number | null = null;
 
-      switch (sortField) {
+      switch (appState.sortField) {
         case 'first_name':
           aValue = a.first_name || '';
           bValue = b.first_name || '';
@@ -150,135 +313,138 @@ export default function AdminProfilesPage() {
       if (bValue === null) return -1;
 
       const comparison = aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-      return sortDirection === 'asc' ? comparison : -comparison;
+      return appState.sortDirection === 'asc' ? comparison : -comparison;
     });
 
-    setFilteredProfiles(filtered);
-    setCurrentPage(1); // Reset to first page when filter changes
-  }, [profiles, searchQuery, sortField, sortDirection]);
+    return filtered;
+  }, [appState.profiles, appState.searchQuery, appState.sortField, appState.sortDirection]);
+
+  // Reset to first page when filter changes
+  useEffect(() => {
+    setAppState(prev => ({ ...prev, currentPage: 1 }));
+  }, [appState.searchQuery, appState.sortField, appState.sortDirection]);
 
   // Pagination
-  const totalPages = Math.ceil(filteredProfiles.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedProfiles = filteredProfiles.slice(startIndex, endIndex);
+  const pagination = useMemo(() => {
+    const totalPages = Math.ceil(filteredAndSortedProfiles.length / ITEMS_PER_PAGE);
+    const startIndex = (appState.currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    const paginatedProfiles = filteredAndSortedProfiles.slice(startIndex, endIndex);
 
-  // Handle sort
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
-  };
+    return { totalPages, startIndex, endIndex, paginatedProfiles };
+  }, [filteredAndSortedProfiles, appState.currentPage]);
 
-  // Check if current user can edit a profile
-  const canEditProfile = (profile: ProfileWithRole): boolean => {
-    // Super admins can edit anyone
-    if (currentUserIsSuperAdmin) {
-      return true;
-    }
-    // Users can always edit their own profile
-    if (currentUserId && profile.id === currentUserId) {
-      return true;
-    }
-    // Admins can only edit sales and sales_support, not admin or super_admin
-    if (profile.role === 'admin' || profile.role === 'super_admin') {
-      return false;
-    }
-    return true;
-  };
+  // ============================================================================
+  // Event Handlers
+  // ============================================================================
 
-  // Handle edit
-  const handleEdit = (profile: ProfileWithRole) => {
+  const handleSort = useCallback((field: SortField) => {
+    setAppState(prev => {
+      if (prev.sortField === field) {
+        return {
+          ...prev,
+          sortDirection: prev.sortDirection === 'asc' ? 'desc' : 'asc',
+        };
+      }
+      return {
+        ...prev,
+        sortField: field,
+        sortDirection: 'asc',
+      };
+    });
+  }, []);
+
+  const handleSearchChange = useCallback((value: string) => {
+    setAppState(prev => ({ ...prev, searchQuery: value }));
+  }, []);
+
+  const handlePageChange = useCallback((newPage: number) => {
+    setAppState(prev => ({ ...prev, currentPage: newPage }));
+  }, []);
+
+  const handleEdit = useCallback((profile: ProfileWithRole) => {
     if (!canEditProfile(profile)) {
-      setError('Sie haben keine Berechtigung, dieses Profil zu bearbeiten. Nur Super-Administratoren können Admin- und Super-Admin-Profile bearbeiten.');
-      setTimeout(() => setError(null), 5000);
+      showError('Sie haben keine Berechtigung, dieses Profil zu bearbeiten. Nur Super-Administratoren können Admin- und Super-Admin-Profile bearbeiten.');
       return;
     }
-    setEditingProfile(profile);
-  };
+    setModalState(prev => ({ ...prev, editingProfile: profile }));
+  }, [canEditProfile, showError]);
 
-  const handleDeleteUser = async () => {
-    const profile = userToDelete;
+  const handleDeleteUser = useCallback(async () => {
+    const profile = modalState.userToDelete;
     if (!profile) return;
 
-    if (!currentUserIsSuperAdmin) {
-      setError('Nur Super-Administratoren können Benutzerkonten löschen.');
-      setTimeout(() => setError(null), 4000);
+    if (!userState.isSuperAdmin) {
+      showError('Nur Super-Administratoren können Benutzerkonten löschen.');
       return;
     }
 
-    if (currentUserId && profile.id === currentUserId) {
-      setError('Sie können Ihr eigenes Konto nicht löschen.');
-      setTimeout(() => setError(null), 4000);
+    if (userState.userId && profile.id === userState.userId) {
+      showError('Sie können Ihr eigenes Konto nicht löschen.');
       return;
     }
 
-    setDeletingUserId(profile.id);
+    setModalState(prev => ({ ...prev, deletingUserId: profile.id }));
     setError(null);
     setSuccess(null);
+    
     try {
       const result = await deleteUserAccount(profile.id);
       if (!result.success) {
         throw new Error(result.error || 'Benutzer konnte nicht gelöscht werden');
       }
-      setSuccess('Benutzer erfolgreich gelöscht');
+      showSuccess('Benutzer erfolgreich gelöscht');
       await loadProfiles();
-      setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
       console.error('Error deleting user:', err);
       const errorMessage = err instanceof Error ? err.message : 'Benutzer konnte nicht gelöscht werden';
       setError(errorMessage);
     } finally {
-      setDeletingUserId(null);
+      setModalState(prev => ({ ...prev, deletingUserId: null }));
     }
-  };
+  }, [modalState.userToDelete, userState.isSuperAdmin, userState.userId, showError, showSuccess, loadProfiles]);
 
-  const openDeleteModal = (profile: ProfileWithRole) => {
-    setUserToDelete(profile);
-    setIsDeleteModalOpen(true);
-  };
+  const openDeleteModal = useCallback((profile: ProfileWithRole) => {
+    setModalState(prev => ({
+      ...prev,
+      userToDelete: profile,
+      isDeleteModalOpen: true,
+    }));
+  }, []);
 
-  const closeDeleteModal = () => {
-    setIsDeleteModalOpen(false);
-    setUserToDelete(null);
-  };
+  const closeDeleteModal = useCallback(() => {
+    setModalState(prev => ({
+      ...prev,
+      isDeleteModalOpen: false,
+      userToDelete: null,
+    }));
+  }, []);
 
-  // Handle save profile - directly saves without confirmation
-  const handleSaveProfile = async (updatedData: {
-    first_name: string;
-    last_name: string;
-    email: string;
-    metabase_dashboard_id: number | null;
-    role: UserRole | null;
-  }) => {
-    if (!editingProfile) {
-      return;
-    }
+  const handleSaveProfile = useCallback(async (updatedData: ProfileUpdateData) => {
+    const profile = modalState.editingProfile;
+    if (!profile) return;
 
     // Double-check permissions before saving
-    if (!canEditProfile(editingProfile)) {
-      setError('Sie haben keine Berechtigung, dieses Profil zu bearbeiten. Nur Super-Administratoren können Admin- und Super-Admin-Profile bearbeiten.');
-      setEditingProfile(null);
+    if (!canEditProfile(profile)) {
+      showError('Sie haben keine Berechtigung, dieses Profil zu bearbeiten. Nur Super-Administratoren können Admin- und Super-Admin-Profile bearbeiten.');
+      setModalState(prev => ({ ...prev, editingProfile: null }));
       return;
     }
 
     // Prevent admins from assigning admin or super_admin roles to other users
-    const isEditingOwnProfile = currentUserId && editingProfile.id === currentUserId;
-    if (!currentUserIsSuperAdmin && !isEditingOwnProfile && (updatedData.role === 'admin' || updatedData.role === 'super_admin')) {
-      setError('Sie haben keine Berechtigung, Admin- oder Super-Admin-Rollen zuzuweisen.');
-      setEditingProfile(null);
+    const isEditingOwnProfile = userState.userId && profile.id === userState.userId;
+    if (!userState.isSuperAdmin && !isEditingOwnProfile && 
+        (updatedData.role === 'admin' || updatedData.role === 'super_admin')) {
+      showError('Sie haben keine Berechtigung, Admin- oder Super-Admin-Rollen zuzuweisen.');
+      setModalState(prev => ({ ...prev, editingProfile: null }));
       return;
     }
 
     // Prevent admins from changing their own role (must keep current role)
-    if (!currentUserIsSuperAdmin && isEditingOwnProfile) {
-      const currentRole = editingProfile.role;
-      if (updatedData.role !== currentRole) {
-        setError('Sie können Ihre eigene Rolle nicht ändern.');
-        setEditingProfile(null);
+    if (!userState.isSuperAdmin && isEditingOwnProfile) {
+      if (updatedData.role !== profile.role) {
+        showError('Sie können Ihre eigene Rolle nicht ändern.');
+        setModalState(prev => ({ ...prev, editingProfile: null }));
         return;
       }
     }
@@ -288,11 +454,12 @@ export default function AdminProfilesPage() {
     setSuccess(null);
 
     try {
-      const updateResult = await updateUserProfile(editingProfile.id, {
+      // Update profile data
+      const updateResult = await updateUserProfile(profile.id, {
         first_name: updatedData.first_name,
         last_name: updatedData.last_name,
         email: updatedData.email,
-        metabase_dashboard_id: updatedData.metabase_dashboard_id
+        metabase_dashboard_id: updatedData.metabase_dashboard_id,
       });
 
       if (!updateResult.success) {
@@ -300,49 +467,11 @@ export default function AdminProfilesPage() {
       }
 
       // Handle role change if different
-      const currentRole = editingProfile.role;
-      const newRole = updatedData.role;
+      await handleRoleChange(profile.id, profile.role, updatedData.role);
 
-      if (currentRole !== newRole) {
-        // Case 1: Assigning "No Role" (newRole is null) - only revoke existing role
-        if (!newRole && currentRole) {
-          const revokeResult = await revokeRoleFromUser(editingProfile.id, currentRole);
-          if (!revokeResult.success) {
-            if (!revokeResult.error?.includes('not found') && !revokeResult.error?.includes('does not exist')) {
-              throw new Error(revokeResult.error || 'Rolle konnte nicht entzogen werden');
-            }
-          }
-        }
-        // Case 2: Assigning role from "No Role" (currentRole is null) - only grant new role
-        else if (newRole && !currentRole) {
-          const grantResult = await grantRoleToUser(editingProfile.id, newRole);
-          if (!grantResult.success) {
-            throw new Error(grantResult.error || 'Rolle konnte nicht zugewiesen werden');
-          }
-        }
-        // Case 3: Changing from one role to another - revoke old and grant new
-        else if (currentRole && newRole) {
-          const revokeResult = await revokeRoleFromUser(editingProfile.id, currentRole);
-          if (!revokeResult.success) {
-            if (!revokeResult.error?.includes('not found') && !revokeResult.error?.includes('does not exist')) {
-              throw new Error(revokeResult.error || 'Rolle konnte nicht entzogen werden');
-            }
-          }
-          const grantResult = await grantRoleToUser(editingProfile.id, newRole);
-          if (!grantResult.success) {
-            throw new Error(grantResult.error || 'Rolle konnte nicht zugewiesen werden');
-          }
-        }
-      }
-
-      setSuccess('Profil erfolgreich aktualisiert');
+      showSuccess('Profil erfolgreich aktualisiert');
       await loadProfiles();
-      
-      // Close edit modal after successful save
-      setEditingProfile(null);
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(null), 3000);
+      setModalState(prev => ({ ...prev, editingProfile: null }));
     } catch (err) {
       console.error('Error updating profile:', err);
       const errorMessage = err instanceof Error ? err.message : 'Profil konnte nicht aktualisiert werden';
@@ -351,25 +480,52 @@ export default function AdminProfilesPage() {
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [modalState.editingProfile, userState, canEditProfile, handleRoleChange, showError, showSuccess, loadProfiles]);
 
 
-  if (!isAuthorized) {
+  // ============================================================================
+  // Render
+  // ============================================================================
+
+  // Show loading state while checking authorization or loading data
+  if (!userState.isAuthorized || isLoading) {
     return (
       <div className="main-container">
         <div style={{ textAlign: 'center', padding: '40px' }}>
           <div className="loading" style={{ margin: '0 auto' }}></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="main-container">
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <div className="loading" style={{ margin: '0 auto' }}></div>
-          <p style={{ marginTop: '20px', color: 'var(--text-secondary)' }}>Profile werden geladen...</p>
+          <p style={{ marginTop: '20px', color: 'var(--text-secondary)' }}>
+            {!userState.isAuthorized ? 'Autorisierung wird überprüft...' : 'Profile werden geladen...'}
+          </p>
+          {error && (
+            <div style={{
+              marginTop: '20px',
+              padding: '12px 16px',
+              background: 'var(--danger-bg)',
+              border: '1px solid var(--danger-border)',
+              borderRadius: '8px',
+              color: 'var(--danger-text)',
+              fontSize: '14px',
+              maxWidth: '500px',
+              margin: '20px auto 0'
+            }}>
+              {error}
+              <button
+                onClick={() => window.location.reload()}
+                style={{
+                  marginTop: '10px',
+                  padding: '8px 16px',
+                  background: 'var(--danger-text)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '13px'
+                }}
+              >
+                Seite neu laden
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -423,8 +579,8 @@ export default function AdminProfilesPage() {
           <input
             type="text"
             placeholder="Nach Name oder E-Mail suchen..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            value={appState.searchQuery}
+            onChange={(e) => handleSearchChange(e.target.value)}
             style={{
               width: '100%',
               padding: '10px 12px 10px 40px',
@@ -466,7 +622,7 @@ export default function AdminProfilesPage() {
           </div>
         )}
 
-        {deletingUserId && (
+        {modalState.deletingUserId && (
           <div style={{
             padding: '12px 16px',
             marginBottom: '16px',
@@ -509,8 +665,8 @@ export default function AdminProfilesPage() {
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       Vorname
-                      {sortField === 'first_name' && (
-                        sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                      {appState.sortField === 'first_name' && (
+                        appState.sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
                       )}
                     </div>
                   </th>
@@ -528,8 +684,8 @@ export default function AdminProfilesPage() {
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       Nachname
-                      {sortField === 'last_name' && (
-                        sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                      {appState.sortField === 'last_name' && (
+                        appState.sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
                       )}
                     </div>
                   </th>
@@ -547,8 +703,8 @@ export default function AdminProfilesPage() {
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       Email
-                      {sortField === 'email' && (
-                        sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                      {appState.sortField === 'email' && (
+                        appState.sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
                       )}
                     </div>
                   </th>
@@ -564,14 +720,14 @@ export default function AdminProfilesPage() {
                 </tr>
               </thead>
               <tbody>
-                {paginatedProfiles.length === 0 ? (
+                {pagination.paginatedProfiles.length === 0 ? (
                   <tr>
                     <td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                      {searchQuery ? 'Keine Profile gefunden, die Ihrer Suche entsprechen' : 'Keine Profile gefunden'}
+                      {appState.searchQuery ? 'Keine Profile gefunden, die Ihrer Suche entsprechen' : 'Keine Profile gefunden'}
                     </td>
                   </tr>
                 ) : (
-                  paginatedProfiles.map((profile) => (
+                  pagination.paginatedProfiles.map((profile) => (
                     <tr
                       key={profile.id}
                       style={{
@@ -616,7 +772,7 @@ export default function AdminProfilesPage() {
                         {canEditProfile(profile) ? (
                           <button
                             onClick={() => handleEdit(profile)}
-                            disabled={isSaving || deletingUserId === profile.id}
+                            disabled={isSaving || modalState.deletingUserId === profile.id}
                             style={{
                               padding: '8px 12px',
                               background: 'transparent',
@@ -651,10 +807,10 @@ export default function AdminProfilesPage() {
                           </span>
                         )}
 
-                        {currentUserIsSuperAdmin && (
+                        {userState.isSuperAdmin && (
                           <button
                             onClick={() => openDeleteModal(profile)}
-                            disabled={deletingUserId === profile.id || isSaving}
+                            disabled={modalState.deletingUserId === profile.id || isSaving}
                             style={{
                               padding: '8px 12px',
                               background: 'transparent',
@@ -675,7 +831,7 @@ export default function AdminProfilesPage() {
                               e.currentTarget.style.background = 'transparent';
                             }}
                           >
-                            {deletingUserId === profile.id ? (
+                            {modalState.deletingUserId === profile.id ? (
                               <>
                                 <div className="loading" style={{ width: '14px', height: '14px', borderWidth: '2px' }}></div>
                                 Wird gelöscht...
@@ -694,7 +850,7 @@ export default function AdminProfilesPage() {
           </div>
 
           {/* Pagination */}
-          {totalPages > 1 && (
+          {pagination.totalPages > 1 && (
             <div style={{
               padding: '16px',
               borderTop: '1px solid var(--border-color)',
@@ -703,19 +859,19 @@ export default function AdminProfilesPage() {
               alignItems: 'center'
             }}>
               <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-                Zeige {startIndex + 1} bis {Math.min(endIndex, filteredProfiles.length)} von {filteredProfiles.length} Profilen
+                Zeige {pagination.startIndex + 1} bis {Math.min(pagination.endIndex, filteredAndSortedProfiles.length)} von {filteredAndSortedProfiles.length} Profilen
               </div>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <button
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
+                  onClick={() => handlePageChange(Math.max(1, appState.currentPage - 1))}
+                  disabled={appState.currentPage === 1}
                   style={{
                     padding: '8px 12px',
                     border: '1px solid var(--border-color)',
                     borderRadius: '6px',
-                    background: currentPage === 1 ? 'var(--section-bg)' : 'var(--input-bg)',
+                    background: appState.currentPage === 1 ? 'var(--section-bg)' : 'var(--input-bg)',
                     color: 'var(--text-primary)',
-                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                    cursor: appState.currentPage === 1 ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '4px',
@@ -726,18 +882,18 @@ export default function AdminProfilesPage() {
                   Zurück
                 </button>
                 <span style={{ color: 'var(--text-secondary)', fontSize: '14px', padding: '0 8px' }}>
-                  Seite {currentPage} von {totalPages}
+                  Seite {appState.currentPage} von {pagination.totalPages}
                 </span>
                 <button
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
+                  onClick={() => handlePageChange(Math.min(pagination.totalPages, appState.currentPage + 1))}
+                  disabled={appState.currentPage === pagination.totalPages}
                   style={{
                     padding: '8px 12px',
                     border: '1px solid var(--border-color)',
                     borderRadius: '6px',
-                    background: currentPage === totalPages ? 'var(--section-bg)' : 'var(--input-bg)',
+                    background: appState.currentPage === pagination.totalPages ? 'var(--section-bg)' : 'var(--input-bg)',
                     color: 'var(--text-primary)',
-                    cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                    cursor: appState.currentPage === pagination.totalPages ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '4px',
@@ -754,27 +910,27 @@ export default function AdminProfilesPage() {
       </div>
 
       {/* Edit Modal */}
-      {editingProfile && (
+      {modalState.editingProfile && (
         <EditProfileModal
-          profile={editingProfile}
+          profile={modalState.editingProfile}
           isOpen={true}
-          onClose={() => setEditingProfile(null)}
+          onClose={() => setModalState(prev => ({ ...prev, editingProfile: null }))}
           onSave={handleSaveProfile}
           isSaving={isSaving}
-          currentUserIsSuperAdmin={currentUserIsSuperAdmin}
-          isEditingOwnProfile={currentUserId ? editingProfile.id === currentUserId : false}
+          currentUserIsSuperAdmin={userState.isSuperAdmin}
+          isEditingOwnProfile={userState.userId ? modalState.editingProfile.id === userState.userId : false}
         />
       )}
 
       {/* Delete Confirmation Modal */}
       <DeleteConfirmationModal
-        isOpen={isDeleteModalOpen}
+        isOpen={modalState.isDeleteModalOpen}
         onClose={closeDeleteModal}
         onConfirm={handleDeleteUser}
         title="Benutzerkonto löschen"
         message={
-          userToDelete
-            ? `Sind Sie sicher, dass Sie ${userToDelete.email || 'diesen Benutzer'} löschen möchten? Dies entfernt das Konto und das zugehörige Profil.`
+          modalState.userToDelete
+            ? `Sind Sie sicher, dass Sie ${modalState.userToDelete.email || 'diesen Benutzer'} löschen möchten? Dies entfernt das Konto und das zugehörige Profil.`
             : 'Sind Sie sicher, dass Sie diesen Benutzer löschen möchten?'
         }
       />

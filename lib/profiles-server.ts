@@ -4,6 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
 import { type UserRole } from "./user-roles";
 
+// ============================================================================
+// Type Definitions
+// ============================================================================
+
 export interface Profile {
   id: string;
   first_name: string | null;
@@ -12,6 +16,17 @@ export interface Profile {
   metabase_dashboard_id: number | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ProfileWithRole extends Profile {
+  role: UserRole | null;
+}
+
+export interface UpdateProfileData {
+  first_name: string;
+  last_name: string;
+  email: string;
+  metabase_dashboard_id: number | null;
 }
 
 export interface CurrentProfileResult {
@@ -26,54 +41,124 @@ export interface CurrentProfileResult {
   error?: string;
 }
 
+export interface FetchProfilesResult {
+  success: boolean;
+  data?: ProfileWithRole[];
+  error?: string;
+  currentUserId?: string;
+  isSuperAdmin?: boolean;
+}
+
+export interface ActionResult {
+  success: boolean;
+  error?: string;
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Authenticates the current user and returns the user object
+ * @throws Error if user is not authenticated
+ */
+async function getAuthenticatedUser() {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  
+  if (authError || !user) {
+    throw new Error("Not authenticated");
+  }
+  
+  return { supabase, user };
+}
+
+/**
+ * Fetches the role of a user
+ * @param supabase - Supabase client instance (awaited from createClient)
+ * @param userId - User ID to check
+ * @returns The user's role or null if no role exists
+ */
+async function getUserRole(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+): Promise<UserRole | null> {
+  const { data: roleRow } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .limit(1)
+    .maybeSingle();
+  
+  return (roleRow?.role as UserRole | undefined) || null;
+}
+
+/**
+ * Checks if a user has permission to edit a profile
+ * @param callerRole - Role of the user attempting to edit
+ * @param targetRole - Role of the profile being edited
+ * @param isSelf - Whether the caller is editing their own profile
+ * @returns True if the user has permission to edit
+ */
+function canEditProfile(
+  callerRole: UserRole | null,
+  targetRole: UserRole | null,
+  isSelf: boolean
+): boolean {
+  if (isSelf) return true;
+  if (callerRole === "super_admin") return true;
+  if (callerRole === "admin" && targetRole !== "admin" && targetRole !== "super_admin") {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Creates an admin Supabase client using service role key
+ * @throws Error if service role key or URL is not configured
+ */
+function createAdminClient() {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  
+  if (!serviceKey || !supabaseUrl) {
+    throw new Error("Service role key or URL not configured");
+  }
+  
+  return createSupabaseAdminClient(supabaseUrl, serviceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
+
+/**
+ * Updates a user profile
+ * @param profileId - ID of the profile to update
+ * @param data - Profile data to update
+ * @returns Success status and error message if any
+ */
 export async function updateUserProfile(
   profileId: string,
-  data: {
-    first_name: string;
-    last_name: string;
-    email: string;
-    metabase_dashboard_id: number | null;
-  }
-): Promise<{ success: boolean; error?: string }> {
+  data: UpdateProfileData
+): Promise<ActionResult> {
   try {
-    const supabase = await createClient();
+    const { supabase, user } = await getAuthenticatedUser();
 
-    // Auth
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return { success: false, error: "User not authenticated" };
-    }
-
-    // Fetch caller role
-    const { data: callerRoleRow } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .limit(1)
-      .maybeSingle();
-    const callerRole = (callerRoleRow?.role as UserRole | undefined) || null;
-
-    // Fetch target role
-    const { data: targetRoleRow } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", profileId)
-      .limit(1)
-      .maybeSingle();
-    const targetRole = (targetRoleRow?.role as UserRole | undefined) || null;
-
-    // Authorization: super_admin can edit anyone; user can edit self; admin cannot edit admins/super_admins
+    // Check permissions
+    const callerRole = await getUserRole(supabase, user.id);
+    const targetRole = await getUserRole(supabase, profileId);
     const isSelf = user.id === profileId;
-    const callerIsSuperAdmin = callerRole === "super_admin";
-    const callerIsAdmin = callerRole === "admin";
-    if (
-      !isSelf &&
-      !callerIsSuperAdmin &&
-      !(callerIsAdmin && targetRole !== "admin" && targetRole !== "super_admin")
-    ) {
-      return { success: false, error: "You do not have permission to edit this profile" };
+
+    if (!canEditProfile(callerRole, targetRole, isSelf)) {
+      return { 
+        success: false, 
+        error: "You do not have permission to edit this profile" 
+      };
     }
 
+    // Update profile
     const { error: updateError } = await supabase
       .from("profiles")
       .update({
@@ -86,74 +171,66 @@ export async function updateUserProfile(
       .eq("id", profileId);
 
     if (updateError) {
+      console.error("Error updating profile:", updateError);
       return { success: false, error: updateError.message };
     }
 
     return { success: true };
   } catch (error) {
     console.error("Error updating user profile:", error);
-    return { success: false, error: error instanceof Error ? error.message : "Failed to update profile" };
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : "Failed to update profile";
+    return { success: false, error: errorMessage };
   }
 }
 
-export async function deleteUserAccount(userId: string): Promise<{ success: boolean; error?: string }> {
+/**
+ * Deletes a user account (only super_admin can delete users)
+ * @param userId - ID of the user account to delete
+ * @returns Success status and error message if any
+ */
+export async function deleteUserAccount(userId: string): Promise<ActionResult> {
   try {
-    const supabase = await createClient();
+    const { supabase, user } = await getAuthenticatedUser();
 
-    // Get current user and ensure super_admin
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return { success: false, error: "Not authenticated" };
-    }
-
-    const { data: roleRow, error: roleError } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .limit(1)
-      .maybeSingle();
-
-    if (roleError || roleRow?.role !== "super_admin") {
+    // Check if user is super_admin
+    const role = await getUserRole(supabase, user.id);
+    if (role !== "super_admin") {
       return { success: false, error: "Only super_admin can delete users" };
     }
 
+    // Prevent self-deletion
     if (user.id === userId) {
       return { success: false, error: "You cannot delete your own account" };
     }
 
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    if (!serviceKey || !supabaseUrl) {
-      return { success: false, error: "Service role key or URL not configured" };
-    }
-
-    const adminClient = createSupabaseAdminClient(supabaseUrl, serviceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    });
-
+    // Use admin client to delete user
+    const adminClient = createAdminClient();
     const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
+    
     if (deleteError) {
+      console.error("Error deleting user:", deleteError);
       return { success: false, error: deleteError.message };
     }
 
     return { success: true };
   } catch (error) {
     console.error("Error deleting user account:", error);
-    return { success: false, error: error instanceof Error ? error.message : "Failed to delete user" };
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : "Failed to delete user";
+    return { success: false, error: errorMessage };
   }
 }
 
+/**
+ * Fetches the current authenticated user's profile
+ * @returns The user's profile or error message
+ */
 export async function fetchCurrentProfile(): Promise<CurrentProfileResult> {
   try {
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return { success: false, error: "Not authenticated" };
-    }
+    const { supabase, user } = await getAuthenticatedUser();
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
@@ -162,7 +239,12 @@ export async function fetchCurrentProfile(): Promise<CurrentProfileResult> {
       .single();
 
     if (profileError) {
+      console.error("Error fetching profile:", profileError);
       return { success: false, error: profileError.message };
+    }
+
+    if (!profile) {
+      return { success: false, error: "Profile not found" };
     }
 
     return {
@@ -177,39 +259,21 @@ export async function fetchCurrentProfile(): Promise<CurrentProfileResult> {
     };
   } catch (error) {
     console.error("Error fetching current profile:", error);
-    return { success: false, error: "Failed to fetch profile" };
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : "Failed to fetch profile";
+    return { success: false, error: errorMessage };
   }
-}
-
-export interface ProfileWithRole extends Profile {
-  role: UserRole | null;
-}
-
-export interface FetchProfilesResult {
-  success: boolean;
-  data?: ProfileWithRole[];
-  error?: string;
-  currentUserId?: string;
-  isSuperAdmin?: boolean;
 }
 
 /**
  * Server action to fetch all profiles with their roles
  * Only accessible to admin and super_admin users
+ * @returns All profiles with roles, current user ID, and super admin status
  */
 export async function fetchProfiles(): Promise<FetchProfilesResult> {
   try {
-    const supabase = await createClient();
-    
-    // Get current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError || !user) {
-      return { 
-        success: false, 
-        error: 'User not authenticated' 
-      };
-    }
+    const { supabase, user } = await getAuthenticatedUser();
 
     // Check if user is admin or super_admin
     const { data: roleData, error: roleError } = await supabase
@@ -247,7 +311,8 @@ export async function fetchProfiles(): Promise<FetchProfilesResult> {
       };
     }
 
-    if (!profilesData) {
+    // Handle empty result
+    if (!profilesData || profilesData.length === 0) {
       return { 
         success: true, 
         data: [], 
@@ -257,7 +322,16 @@ export async function fetchProfiles(): Promise<FetchProfilesResult> {
     }
 
     // Map the database function results to ProfileWithRole format
-    const profilesWithRoles: ProfileWithRole[] = profilesData.map((row: any) => ({
+    const profilesWithRoles: ProfileWithRole[] = profilesData.map((row: {
+      id: string;
+      first_name: string | null;
+      last_name: string | null;
+      email: string | null;
+      metabase_dashboard_id: number | null;
+      created_at: string;
+      updated_at: string;
+      role: string | null;
+    }) => ({
       id: row.id,
       first_name: row.first_name,
       last_name: row.last_name,
@@ -276,11 +350,12 @@ export async function fetchProfiles(): Promise<FetchProfilesResult> {
     };
   } catch (error) {
     console.error('Error in fetchProfiles:', error);
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : 'Failed to load profiles. Please check your permissions and ensure RLS policies are configured correctly.';
     return { 
       success: false, 
-      error: error instanceof Error 
-        ? error.message 
-        : 'Failed to load profiles. Please check your permissions and ensure RLS policies are configured correctly.' 
+      error: errorMessage
     };
   }
 }

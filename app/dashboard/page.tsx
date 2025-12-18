@@ -1,69 +1,100 @@
 'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import DashboardIframe from "@/components/dashboard/DashboardIframe";
 import { fetchDashboardProfiles, refreshDashboardUrl } from "@/lib/dashboard-server";
 import type { DashboardProfileOption } from "@/lib/dashboard-server";
 
-export default function ProtectedPage() {
-  const [profiles, setProfiles] = useState<DashboardProfileOption[]>([]);
-  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
-  const [currentDashboardId, setCurrentDashboardId] = useState<number | null>(null);
-  const [currentUrl, setCurrentUrl] = useState<string | null>(null);
-  const [isAdminView, setIsAdminView] = useState(false);
+interface DashboardState {
+  profiles: DashboardProfileOption[];
+  selectedProfileId: string | null;
+  currentDashboardId: number | null;
+  currentUrl: string | null;
+  isAdminView: boolean;
+}
+
+export default function DashboardPage() {
+  const [state, setState] = useState<DashboardState>({
+    profiles: [],
+    selectedProfileId: null,
+    currentDashboardId: null,
+    currentUrl: null,
+    isAdminView: false,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadProfiles = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const data = await fetchDashboardProfiles();
-        setProfiles(data.profiles);
-        setSelectedProfileId(data.initialProfileId);
-        setCurrentDashboardId(data.initialDashboardId);
-        setCurrentUrl(data.initialIframeUrl);
-        setIsAdminView(data.isAdminView);
-      } catch (err) {
-        console.error("Error loading dashboards:", err);
-        setError("Dashboard konnte nicht geladen werden. Bitte erneut versuchen.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadProfiles();
+  const loadProfiles = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await fetchDashboardProfiles();
+      setState({
+        profiles: data.profiles,
+        selectedProfileId: data.initialProfileId,
+        currentDashboardId: data.initialDashboardId,
+        currentUrl: data.initialIframeUrl,
+        isAdminView: data.isAdminView,
+      });
+    } catch (err) {
+      console.error("Error loading dashboards:", err);
+      const errorMessage = err instanceof Error 
+        ? err.message 
+        : "Dashboard konnte nicht geladen werden. Bitte erneut versuchen.";
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  const handleChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
+  useEffect(() => {
+    loadProfiles();
+  }, [loadProfiles]);
+
+  const handleProfileChange = useCallback(async (event: React.ChangeEvent<HTMLSelectElement>) => {
     const newProfileId = event.target.value;
-    setSelectedProfileId(newProfileId);
-    const profile = profiles.find((p) => p.id === newProfileId);
+    const profile = state.profiles.find((p) => p.id === newProfileId);
+    
     if (!profile || !profile.dashboardId) {
-      setCurrentDashboardId(null);
-      setCurrentUrl(null);
+      setState(prev => ({
+        ...prev,
+        selectedProfileId: newProfileId,
+        currentDashboardId: null,
+        currentUrl: null,
+      }));
       setError("Für dieses Profil ist kein Dashboard konfiguriert.");
       return;
     }
 
     setError(null);
     setIsLoading(true);
+    
     try {
       const url = await refreshDashboardUrl(profile.dashboardId);
-      setCurrentDashboardId(profile.dashboardId);
-      setCurrentUrl(url);
+      setState(prev => ({
+        ...prev,
+        selectedProfileId: newProfileId,
+        currentDashboardId: profile.dashboardId,
+        currentUrl: url,
+      }));
     } catch (err) {
       console.error("Error loading dashboard URL:", err);
-      setError("Dashboard konnte nicht geladen werden.");
-      setCurrentDashboardId(null);
-      setCurrentUrl(null);
+      const errorMessage = err instanceof Error 
+        ? err.message 
+        : "Dashboard konnte nicht geladen werden.";
+      setError(errorMessage);
+      setState(prev => ({
+        ...prev,
+        selectedProfileId: newProfileId,
+        currentDashboardId: null,
+        currentUrl: null,
+      }));
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [state.profiles]);
 
-  if (isLoading && !currentUrl) {
+  if (isLoading && !state.currentUrl) {
     return (
       <div className="w-full h-full flex items-center justify-center p-8">
         <div className="text-center">
@@ -74,7 +105,7 @@ export default function ProtectedPage() {
     );
   }
 
-  if (!currentDashboardId || !currentUrl) {
+  if (!state.currentDashboardId || !state.currentUrl) {
     return (
       <div className="w-full flex items-center justify-center p-8">
         <div className="text-center">
@@ -89,17 +120,22 @@ export default function ProtectedPage() {
 
   return (
     <div className="space-y-4">
-      {isAdminView && profiles.length > 0 && (
+      {state.isAdminView && state.profiles.length > 0 && (
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+          <label 
+            htmlFor="profile-select"
+            className="text-sm font-medium text-gray-700 dark:text-gray-200"
+          >
             Mitarbeiter-Dashboard auswählen
           </label>
           <select
-            value={selectedProfileId || ""}
-            onChange={handleChange}
+            id="profile-select"
+            value={state.selectedProfileId || ""}
+            onChange={handleProfileChange}
             className="w-full max-w-md rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+            disabled={isLoading}
           >
-            {profiles.map((profile) => (
+            {state.profiles.map((profile) => (
               <option key={profile.id} value={profile.id}>
                 {profile.label}
               </option>
@@ -109,16 +145,23 @@ export default function ProtectedPage() {
       )}
 
       {error && (
-        <div className="text-sm text-red-600 dark:text-red-400">{error}</div>
+        <div 
+          className="text-sm text-red-600 dark:text-red-400 p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800"
+          role="alert"
+        >
+          {error}
+        </div>
       )}
 
-      <DashboardIframe
-        key={selectedProfileId}
-        iframeKey={selectedProfileId as string}
-        iframeUrl={currentUrl}
-        dashboardId={currentDashboardId}
-        refreshDashboardUrl={refreshDashboardUrl}
-      />
+      {state.currentUrl && state.currentDashboardId && (
+        <DashboardIframe
+          key={state.selectedProfileId}
+          iframeKey={state.selectedProfileId as string}
+          iframeUrl={state.currentUrl}
+          dashboardId={state.currentDashboardId}
+          refreshDashboardUrl={refreshDashboardUrl}
+        />
+      )}
     </div>
   );
 }
