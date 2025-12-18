@@ -107,9 +107,9 @@ export default function EditProfileModal({
 
   const roleOptions = useMemo(() => {
     const options = [
-      { value: '', label: 'Keine Rolle' },
-      { value: 'sales', label: 'Verkauf' },
-      { value: 'sales_support', label: 'Verkaufsunterstützung' },
+      { value: '', label: 'No Role' },
+      { value: 'sales', label: 'Sales' },
+      { value: 'sales_support', label: 'Sales Support' },
     ];
 
     if (currentUserIsSuperAdmin) {
