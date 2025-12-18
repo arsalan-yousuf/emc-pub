@@ -193,13 +193,11 @@ export async function fetchAllSummariesForView(): Promise<{ success: boolean; da
 
     // Get unique user IDs from summaries (RLS has already filtered them)
     const uniqueUserIds = [...new Set(summariesData.map((s: any) => s.user_id))];
-    console.log('uniqueUserIds', uniqueUserIds);
     // Fetch profiles for the user IDs (RLS will filter profiles based on access)
     const { data: profilesData, error: profilesError } = await supabase
       .from('profiles')
       .select('id, first_name, last_name, email');
       // .in('id', uniqueUserIds);
-    console.log('profilesData', profilesData);
     if (profilesError) {
       console.error('Error fetching profiles:', profilesError);
       // Continue without profile data if profiles can't be fetched
