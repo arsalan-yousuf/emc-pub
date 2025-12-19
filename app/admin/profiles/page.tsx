@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { isAdmin, isSuperAdmin, grantRoleToUser, revokeRoleFromUser, type UserRole } from '@/lib/user-roles';
+import { grantRoleToUser, revokeRoleFromUser, type UserRole } from '@/lib/user-roles';
 import { fetchProfiles, type ProfileWithRole, deleteUserAccount, updateUserProfile, type UpdateProfileData } from '@/lib/profiles-server';
 import { useRouter } from 'next/navigation';
-import { Edit2, Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Edit2, Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import EditProfileModal from '@/components/admin/EditProfileModal';
 import DeleteConfirmationModal from '@/components/summaries/DeleteConfirmationModal';
+import { useUser } from '@/contexts/UserContext';
 
 // ============================================================================
 // Type Definitions
@@ -48,6 +49,7 @@ const SUCCESS_DISPLAY_DURATION = 3000;
 export default function AdminProfilesPage() {
   const router = useRouter();
   const isLoadingRef = useRef(false);
+  const { isAdmin: userIsAdmin, isSuperAdmin: userIsSuperAdmin, isLoading: userContextLoading, user } = useUser();
 
   // State management
   const [appState, setAppState] = useState<AppState>({
@@ -74,6 +76,7 @@ export default function AdminProfilesPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -189,44 +192,33 @@ export default function AdminProfilesPage() {
   // Check authorization and load profiles on mount
   useEffect(() => {
     let isMounted = true;
-    let timeoutId: NodeJS.Timeout | null = null;
 
     const checkAuthAndLoad = async () => {
+      // Wait for user context to finish loading
+      if (userContextLoading) {
+        setIsLoading(true);
+        return;
+      }
+
       try {
         setIsLoading(true);
         setError(null);
 
-        // Add timeout to prevent infinite loading
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          timeoutId = setTimeout(() => {
-            reject(new Error('Authorization check timed out. Please refresh the page.'));
-          }, 10000); // 10 second timeout
-        });
-
-        // Race between authorization check and timeout
-        const admin = await Promise.race([
-          isAdmin(),
-          timeoutPromise,
-        ]);
-
-        if (!isMounted) return;
-
-        if (!admin) {
+        // Check authorization using context values (no API calls needed)
+        if (!userIsAdmin) {
+          if (!isMounted) return;
           router.push('/dashboard');
           return;
         }
-        
-        setUserState(prev => ({ ...prev, isAuthorized: true }));
-        
-        // Check super admin status with timeout
-        const superAdmin = await Promise.race([
-          isSuperAdmin(),
-          timeoutPromise,
-        ]);
 
         if (!isMounted) return;
 
-        setUserState(prev => ({ ...prev, isSuperAdmin: superAdmin }));
+        setUserState(prev => ({ 
+          ...prev, 
+          isAuthorized: true,
+          isSuperAdmin: userIsSuperAdmin,
+          userId: user?.id || null
+        }));
         
         // Load profiles
         await loadProfiles();
@@ -239,10 +231,6 @@ export default function AdminProfilesPage() {
           : 'Fehler bei der Autorisierung. Bitte die Seite aktualisieren.';
         setError(errorMessage);
         setIsLoading(false);
-      } finally {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
       }
     };
 
@@ -250,23 +238,25 @@ export default function AdminProfilesPage() {
 
     return () => {
       isMounted = false;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadProfiles]);
+  }, [userContextLoading, userIsAdmin, userIsSuperAdmin, user, loadProfiles, router]);
 
-  // Refresh on window focus to ensure data is fresh when navigating back to this tab
-  useEffect(() => {
-    if (!userState.isAuthorized) return;
+  // Manual refresh handler
+  const handleRefresh = useCallback(async () => {
+    if (!userState.isAuthorized || isLoading || isRefreshing) return;
     
-    const handleFocus = () => {
-      loadProfiles();
-    };
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, [userState.isAuthorized, loadProfiles]);
+    setIsRefreshing(true);
+    try {
+      await loadProfiles();
+      showSuccess('Profile erfolgreich aktualisiert');
+    } catch (err) {
+      console.error('Error refreshing profiles:', err);
+      showError('Fehler beim Aktualisieren der Profile');
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [userState.isAuthorized, isLoading, isRefreshing, loadProfiles, showSuccess, showError]);
 
   // Filter and sort profiles
   const filteredAndSortedProfiles = useMemo(() => {
@@ -538,39 +528,40 @@ export default function AdminProfilesPage() {
           <h1 style={{ fontSize: '28px', fontWeight: '600', marginBottom: '8px', color: 'var(--text-primary)' }}>
             Benutzerprofile-Verwaltung
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-            Benutzerprofile verwalten und Rollen zuweisen
-          </p>
-          {/* <div style={{ marginTop: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>
+              Benutzerprofile verwalten und Rollen zuweisen
+            </p>
             <button
-              onClick={async () => {
-                setIsRefreshing(true);
-                await loadProfiles();
-                setIsRefreshing(false);
-              }}
-              disabled={isLoading || isRefreshing}
+              onClick={handleRefresh}
+              disabled={isLoading || isRefreshing || !userState.isAuthorized}
               style={{
-                padding: '8px 12px',
+                padding: '8px 16px',
                 border: '1px solid var(--border-color)',
                 borderRadius: '8px',
                 background: 'var(--input-bg)',
                 color: 'var(--text-primary)',
-                cursor: isLoading || isRefreshing ? 'not-allowed' : 'pointer',
+                cursor: (isLoading || isRefreshing || !userState.isAuthorized) ? 'not-allowed' : 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '8px',
-                fontSize: '13px'
+                fontSize: '14px',
+                fontWeight: '500',
+                transition: 'all 0.2s',
+                opacity: (isLoading || isRefreshing || !userState.isAuthorized) ? 0.6 : 1
               }}
+              title="Profile aktualisieren"
             >
-              <div className="loading" style={{
-                width: '14px',
-                height: '14px',
-                borderWidth: '2px',
-                visibility: (isLoading || isRefreshing) ? 'visible' : 'hidden'
-              }}></div>
-              Refresh profiles
+              <RefreshCw 
+                style={{ 
+                  width: '16px', 
+                  height: '16px',
+                  animation: isRefreshing ? 'spin 1s linear infinite' : 'none'
+                }} 
+              />
+              {isRefreshing ? 'Wird aktualisiert...' : 'Aktualisieren'}
             </button>
-          </div> */}
+          </div>
         </div>
 
         {/* Search */}

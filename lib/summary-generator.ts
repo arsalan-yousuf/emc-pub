@@ -3,6 +3,8 @@
 interface SummaryGenerationParams {
   transcript: string;
   language: 'german' | 'english';
+  customer_name: string;
+  interlocutor: string;
   apiProvider: 'langdock';
   selectedModel: string;
 }
@@ -15,7 +17,7 @@ interface ApiResponse {
   model?: string;
 }
 
-function buildSummaryPrompt(transcript: string, language: string): string {
+function buildSummaryPrompt(transcript: string, language: string, customer_name: string, interlocutor: string): string {
   const isGerman = language === 'german' || language === 'de';
 
   if (isGerman) {
@@ -26,6 +28,15 @@ IMPORTANT CONTEXT ABOUT THE INPUT:
 - The input IS a spoken voice note recorded by the sales agent AFTER the call.
 - The voice note describes what was discussed with the customer.
 - You MUST extract and structure the information based on the agent’s summary.
+
+ADDITIONAL STRUCTURED INPUTS:
+- Client / Customer name: ${customer_name}
+- Interlocutor (person spoken to at customer): ${interlocutor}
+
+USAGE RULE FOR STRUCTURED INPUTS:
+- If these inputs are provided, you MUST use them to populate the relevant fields.
+- If they are empty or missing, extract the information from the voice note.
+- If neither source provides the information, write exactly: "Nicht erwähnt".
 
 LANGUAGE OUTPUT RULE:
 - The entire output MUST be written ONLY in German.
@@ -94,6 +105,15 @@ IMPORTANT CONTEXT ABOUT THE INPUT:
 - The input IS a spoken voice note recorded by the sales agent AFTER the call.
 - The voice note describes what was discussed with the customer.
 - You MUST extract and structure the information based on the agent’s summary.
+
+ADDITIONAL STRUCTURED INPUTS:
+- Client / Customer name: ${customer_name}
+- Interlocutor (person spoken to at customer): ${interlocutor}
+
+USAGE RULE FOR STRUCTURED INPUTS:
+- If these inputs are provided, you MUST use them to populate the relevant fields.
+- If they are empty or missing, extract the information from the voice note.
+- If neither source provides the information, write exactly: "Not mentioned".
 
 LANGUAGE OUTPUT RULE:
 - The entire output MUST be written ONLY in English.
@@ -169,7 +189,7 @@ export async function generateSummary(params: SummaryGenerationParams): Promise<
     };
   }
 
-  const prompt = buildSummaryPrompt(params.transcript, params.language);
+  const prompt = buildSummaryPrompt(params.transcript, params.language, params.customer_name, params.interlocutor);
 
   const requestBody = {
     model: params.selectedModel,

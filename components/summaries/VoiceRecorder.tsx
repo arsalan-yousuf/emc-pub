@@ -105,7 +105,7 @@ export default function VoiceRecorder({
       if (transcript && transcript.trim()) {
         onTranscription(transcript.trim());
       } else {
-        setError('No speech detected');
+        setError('Speech not detected in the selected language');
       }
     } catch (err) {
       console.error('Error processing audio:', err);

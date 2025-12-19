@@ -74,7 +74,9 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
         transcript,
         language,
         apiProvider,
-        selectedModel
+        selectedModel,
+        customer_name: customerName,
+        interlocutor: customerPartner
       });
 
       if (result.success && result.content) {
@@ -323,9 +325,26 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
           <VoiceRecorder
             onTranscription={handleTranscription}
             language={language}
-            disabled={isGenerating || isSaving}
+            disabled={
+              isGenerating ||
+              isSaving ||
+              !customerName.trim() ||
+              !customerPartner.trim()
+            }
             onRecordingStateChange={setIsRecording}
           />
+          {(!customerName.trim() || !customerPartner.trim()) && (
+            <p
+              style={{
+                marginTop: '8px',
+                fontSize: '13px',
+                color: 'var(--muted-foreground)',
+                textAlign: 'center'
+              }}
+            >
+              Bitte geben Sie zuerst <strong>Kundenname</strong> und <strong>Gesprächspartner</strong> ein, um die Aufnahme zu starten.
+            </p>
+          )}
         </div>
 
         {/* Transcript Textarea */}
