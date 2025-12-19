@@ -222,27 +222,34 @@ export default function EditProfileModal({
                 />
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {/* <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-primary)' }}>
                   Email
                 </label>
                 <input
                   type="email"
                   value={formData.email}
-                  onChange={(e) => updateField('email', e.target.value)}
-                  required
-                  disabled={isSaving}
+                  // onChange={(e) => updateField('email', e.target.value)}
+                  // required
+                  // disabled={isSaving}
+                  readOnly
+                  disabled
                   style={{
                     padding: '10px 12px',
                     border: '1px solid var(--border-color)',
                     borderRadius: '8px',
-                    background: 'var(--input-bg)',
-                    color: 'var(--text-primary)',
+                    background: 'var(--section-bg)',
+                    color: 'var(--text-secondary)',
                     fontSize: '14px',
-                    width: '100%'
+                    width: '100%',
+                    cursor: 'not-allowed',
+                    opacity: 0.7
                   }}
                 />
-              </div>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>
+                  E-Mail-Adresse kann nicht geändert werden
+                </p>
+              </div> */}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-primary)' }}>

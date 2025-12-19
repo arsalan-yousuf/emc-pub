@@ -1,23 +1,64 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import VoiceRecorder from './VoiceRecorder';
 import { generateSummary } from '@/lib/summary-generator';
 import { saveSummary } from '@/lib/summaries-db';
 import { createClient } from '@/lib/supabase/client';
-import { CheckCircle, XCircle, AlertTriangle, Info, Edit2, Save, X } from 'lucide-react';
+import { Edit2, Save, X } from 'lucide-react';
+
+// ============================================================================
+// Type Definitions
+// ============================================================================
 
 interface GeneratorTabProps {
   showToast?: (type: 'success' | 'error' | 'warning' | 'info', message: string, duration?: number) => void;
   onSummarySaved?: () => void;
 }
 
+interface CustomerInfo {
+  name: string;
+  partner: string;
+  email: string;
+  phone: string;
+}
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const DEFAULT_MODEL = 'gpt-4.1';
+const STORAGE_KEY_MODEL = 'langDockModel';
+
+const ERROR_MESSAGES = {
+  NO_TRANSCRIPT: 'Bitte geben Sie ein Transkript an',
+  NO_CUSTOMER_NAME: 'Bitte geben Sie den Kundennamen an',
+  NO_SUMMARY: 'Keine Zusammenfassung zum Speichern',
+  NOT_AUTHENTICATED: 'Benutzer nicht authentifiziert',
+  GENERATION_FAILED: 'Beim Generieren der Zusammenfassung ist ein Fehler aufgetreten',
+  SAVE_FAILED: 'Beim Speichern der Zusammenfassung ist ein Fehler aufgetreten',
+} as const;
+
+const SUCCESS_MESSAGES = {
+  GENERATED: 'Zusammenfassung erfolgreich generiert!',
+  UPDATED: 'Zusammenfassung aktualisiert!',
+  SAVED: 'Zusammenfassung erfolgreich gespeichert!',
+  COPIED: 'Zusammenfassung in die Zwischenablage kopiert!',
+} as const;
+
+// ============================================================================
+// Component
+// ============================================================================
+
 export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTabProps) {
+  // State
   const [language, setLanguage] = useState<'german' | 'english'>('german');
-  const [customerName, setCustomerName] = useState('');
-  const [customerPartner, setCustomerPartner] = useState('');
-  const [customerEmail, setCustomerEmail] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({
+    name: '',
+    partner: '',
+    email: '',
+    phone: '',
+  });
   const [transcript, setTranscript] = useState('');
   const [summary, setSummary] = useState('');
   const [isEditingSummary, setIsEditingSummary] = useState(false);
@@ -26,21 +67,25 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
-  const [apiProvider, setApiProvider] = useState<'langdock'>('langdock');
-  const [selectedModel, setSelectedModel] = useState('gpt-4.1');
+  const [apiProvider] = useState<'langdock'>('langdock');
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL);
 
-  // Load user and settings
+  // ============================================================================
+  // Effects
+  // ============================================================================
+
   useEffect(() => {
     const loadUser = async () => {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
+      
       if (user) {
         setUserId(user.id);
       }
     };
 
     const loadSettings = () => {
-      const savedModel = localStorage.getItem('langDockModel') || 'gpt-4.1';
+      const savedModel = localStorage.getItem(STORAGE_KEY_MODEL) || DEFAULT_MODEL;
       setSelectedModel(savedModel);
     };
 
@@ -48,25 +93,63 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
     loadSettings();
   }, []);
 
-  const handleTranscription = (text: string) => {
-    setTranscript(prev => {
-      if (prev.trim()) {
-        return prev + ' ' + text;
-      }
-      return text;
-    });
-  };
+  // ============================================================================
+  // Validation
+  // ============================================================================
 
-  const handleGenerateSummary = async () => {
+  const validateGeneration = useCallback((): boolean => {
     if (!transcript.trim()) {
-      showToast?.('error', 'Bitte geben Sie ein Transkript an');
-      return;
+      showToast?.('error', ERROR_MESSAGES.NO_TRANSCRIPT);
+      return false;
     }
 
-    if (!customerName.trim()) {
-      showToast?.('error', 'Bitte geben Sie den Kundennamen an');
-      return;
+    if (!customerInfo.name.trim()) {
+      showToast?.('error', ERROR_MESSAGES.NO_CUSTOMER_NAME);
+      return false;
     }
+
+    return true;
+  }, [transcript, customerInfo.name, showToast]);
+
+  const validateSave = useCallback((summaryToSave: string, currentUserId: string | null): boolean => {
+    if (!summaryToSave.trim()) {
+      showToast?.('error', ERROR_MESSAGES.NO_SUMMARY);
+      return false;
+    }
+
+    if (!currentUserId) {
+      showToast?.('error', ERROR_MESSAGES.NOT_AUTHENTICATED);
+      return false;
+    }
+
+    return true;
+  }, [showToast]);
+
+  // ============================================================================
+  // Handlers
+  // ============================================================================
+
+  const handleTranscription = useCallback((text: string) => {
+    setTranscript(prev => (prev.trim() ? `${prev} ${text}` : text));
+  }, []);
+
+  const updateCustomerInfo = useCallback(<K extends keyof CustomerInfo>(
+    field: K,
+    value: CustomerInfo[K]
+  ) => {
+    setCustomerInfo(prev => ({ ...prev, [field]: value }));
+  }, []);
+
+  const resetForm = useCallback(() => {
+    setTranscript('');
+    setSummary('');
+    setEditedSummary('');
+    setIsEditingSummary(false);
+    setCustomerInfo({ name: '', partner: '', email: '', phone: '' });
+  }, []);
+
+  const handleGenerateSummary = useCallback(async () => {
+    if (!validateGeneration()) return;
 
     setIsGenerating(true);
     try {
@@ -75,91 +158,108 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
         language,
         apiProvider,
         selectedModel,
-        customer_name: customerName,
-        interlocutor: customerPartner
+        customer_name: customerInfo.name,
+        interlocutor: customerInfo.partner,
       });
 
       if (result.success && result.content) {
         setSummary(result.content);
         setEditedSummary(result.content);
         setIsEditingSummary(false);
-        showToast?.('success', 'Zusammenfassung erfolgreich generiert!');
+        showToast?.('success', SUCCESS_MESSAGES.GENERATED);
       } else {
         showToast?.('error', result.error || 'Zusammenfassung konnte nicht generiert werden');
       }
     } catch (error) {
       console.error('Error generating summary:', error);
-      showToast?.('error', 'Beim Generieren der Zusammenfassung ist ein Fehler aufgetreten');
+      showToast?.('error', ERROR_MESSAGES.GENERATION_FAILED);
     } finally {
       setIsGenerating(false);
     }
-  };
+  }, [transcript, language, apiProvider, selectedModel, customerInfo, validateGeneration, showToast]);
 
-  const handleEditSummary = () => {
+  const handleEditSummary = useCallback(() => {
     setEditedSummary(summary);
     setIsEditingSummary(true);
-  };
+  }, [summary]);
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit = useCallback(() => {
     setEditedSummary(summary);
     setIsEditingSummary(false);
-  };
+  }, [summary]);
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = useCallback(() => {
     setSummary(editedSummary);
     setIsEditingSummary(false);
-    showToast?.('success', 'Zusammenfassung aktualisiert!');
-  };
+    showToast?.('success', SUCCESS_MESSAGES.UPDATED);
+  }, [editedSummary, showToast]);
 
-  const handleSaveSummary = async () => {
+  const handleSaveSummary = useCallback(async () => {
     const summaryToSave = isEditingSummary ? editedSummary : summary;
-    
-    if (!summaryToSave.trim()) {
-      showToast?.('error', 'Keine Zusammenfassung zum Speichern');
-      return;
+
+    // Fetch user directly if userId is not available (handles race condition)
+    let currentUserId = userId;
+    if (!currentUserId) {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          currentUserId = user.id;
+          setUserId(user.id); // Update state for future use
+        }
+      } catch (error) {
+        console.error('Error fetching user:', error);
+      }
     }
 
-    if (!userId) {
-      showToast?.('error', 'Benutzer nicht authentifiziert');
-      return;
-    }
+    if (!validateSave(summaryToSave, currentUserId)) return;
 
     setIsSaving(true);
     try {
       const result = await saveSummary({
-        user_id: userId,
-        customer_name: customerName,
-        customer_partner: customerPartner || undefined,
-        customer_email: customerEmail || undefined,
-        customer_phone: customerPhone || undefined,
+        user_id: currentUserId!,
+        customer_name: customerInfo.name,
+        customer_partner: customerInfo.partner || undefined,
+        customer_email: customerInfo.email || undefined,
+        customer_phone: customerInfo.phone || undefined,
         transcript,
         summary: summaryToSave,
-        language
+        language,
       });
 
       if (result.success) {
-        showToast?.('success', 'Zusammenfassung erfolgreich gespeichert!');
-        // Reset form
-        setTranscript('');
-        setSummary('');
-        setEditedSummary('');
-        setIsEditingSummary(false);
-        setCustomerName('');
-        setCustomerPartner('');
-        setCustomerEmail('');
-        setCustomerPhone('');
-        // Trigger history refresh
+        showToast?.('success', SUCCESS_MESSAGES.SAVED);
+        resetForm();
         onSummarySaved?.();
       } else {
         showToast?.('error', result.error || 'Zusammenfassung konnte nicht gespeichert werden');
       }
     } catch (error) {
       console.error('Error saving summary:', error);
-      showToast?.('error', 'Beim Speichern der Zusammenfassung ist ein Fehler aufgetreten');
+      showToast?.('error', ERROR_MESSAGES.SAVE_FAILED);
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [isEditingSummary, editedSummary, summary, userId, customerInfo, transcript, language, validateSave, resetForm, showToast, onSummarySaved]);
+
+  const handleCopySummary = useCallback(() => {
+    navigator.clipboard.writeText(summary);
+    showToast?.('success', SUCCESS_MESSAGES.COPIED);
+  }, [summary, showToast]);
+
+  // ============================================================================
+  // Computed Values
+  // ============================================================================
+
+  const isRecordingDisabled = useMemo(
+    () => isGenerating || isSaving || !customerInfo.name.trim() || !customerInfo.partner.trim(),
+    [isGenerating, isSaving, customerInfo.name, customerInfo.partner]
+  );
+
+  const canGenerate = useMemo(
+    () => !isGenerating && transcript.trim() && customerInfo.name.trim(),
+    [isGenerating, transcript, customerInfo.name]
+  );
 
   return (
     <div className="tab-content active">
@@ -185,8 +285,8 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
             }}
             disabled={isRecording}
           >
-            <option value="german">Deutsch</option>
-            <option value="english">Englisch</option>
+            <option value="german">🇩🇪 Deutsch</option>
+            <option value="english">🇬🇧 Englisch</option>
           </select>
         </div>
 
@@ -201,8 +301,8 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
               <input
                 id="customerName"
                 type="text"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
+                value={customerInfo.name}
+                onChange={(e) => updateCustomerInfo('name', e.target.value)}
                 placeholder="John Doe"
                 required
                 style={{
@@ -223,8 +323,8 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
               <input
                 id="customerPartner"
                 type="text"
-                value={customerPartner}
-                onChange={(e) => setCustomerPartner(e.target.value)}
+                value={customerInfo.partner}
+                onChange={(e) => updateCustomerInfo('partner', e.target.value)}
                 placeholder="Jane Doe"
                 required
                 style={{
@@ -245,8 +345,8 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
               <input
                 id="customerEmail"
                 type="email"
-                value={customerEmail}
-                onChange={(e) => setCustomerEmail(e.target.value)}
+                value={customerInfo.email}
+                onChange={(e) => updateCustomerInfo('email', e.target.value)}
                 placeholder="john.doe@example.com"
                 style={{
                   width: '100%',
@@ -266,8 +366,8 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
               <input
                 id="customerPhone"
                 type="tel"
-                value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
+                value={customerInfo.phone}
+                onChange={(e) => updateCustomerInfo('phone', e.target.value)}
                 placeholder="+1234567890"
                 style={{
                   width: '100%',
@@ -325,15 +425,10 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
           <VoiceRecorder
             onTranscription={handleTranscription}
             language={language}
-            disabled={
-              isGenerating ||
-              isSaving ||
-              !customerName.trim() ||
-              !customerPartner.trim()
-            }
+            disabled={isRecordingDisabled}
             onRecordingStateChange={setIsRecording}
           />
-          {(!customerName.trim() || !customerPartner.trim()) && (
+          {(!customerInfo.name.trim() || !customerInfo.partner.trim()) && (
             <p
               style={{
                 marginTop: '8px',
@@ -379,7 +474,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
           <div className="input-section">
             <button
               onClick={handleGenerateSummary}
-              disabled={isGenerating || !transcript.trim() || !customerName.trim()}
+              disabled={!canGenerate}
               style={{
                 width: '100%',
                 padding: '20px',
@@ -389,8 +484,8 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
                 borderRadius: '12px',
                 fontSize: '1.2em',
                 fontWeight: '600',
-                cursor: isGenerating || !transcript.trim() || !customerName.trim() ? 'not-allowed' : 'pointer',
-                opacity: isGenerating || !transcript.trim() || !customerName.trim() ? 0.6 : 1,
+                cursor: canGenerate ? 'pointer' : 'not-allowed',
+                opacity: canGenerate ? 1 : 0.6,
                 transition: 'all 0.3s ease'
               }}
             >
@@ -419,10 +514,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
                     <>
                       <button
                         className="copy-button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(summary);
-                          showToast?.('success', 'Zusammenfassung in die Zwischenablage kopiert!');
-                        }}
+                        onClick={handleCopySummary}
                       >
                         Kopieren
                       </button>

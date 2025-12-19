@@ -1,6 +1,10 @@
 "use server";
 
-interface SummaryGenerationParams {
+// ============================================================================
+// Type Definitions
+// ============================================================================
+
+export interface SummaryGenerationParams {
   transcript: string;
   language: 'german' | 'english';
   customer_name: string;
@@ -9,25 +13,56 @@ interface SummaryGenerationParams {
   selectedModel: string;
 }
 
-interface ApiResponse {
+export interface ApiResponse {
   success: boolean;
   content?: string;
   error?: string;
-  usage?: any;
+  usage?: unknown;
   model?: string;
 }
 
-function buildSummaryPrompt(transcript: string, language: string, customer_name: string, interlocutor: string): string {
-  const isGerman = language === 'german' || language === 'de';
+interface ApiRequestConfig {
+  url: string;
+  body: Record<string, unknown>;
+}
 
-  if (isGerman) {
-    return `You are a professional sales operations assistant for EMC.
+interface ParsedApiResponse {
+  content?: string;
+  usage?: unknown;
+  model?: string;
+}
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const LANGDOCK_API_BASE = 'https://api.langdock.com';
+const LANGDOCK_REGION = 'eu';
+const DEFAULT_TEMPERATURE = 0.7;
+const DEFAULT_MAX_TOKENS = 3000;
+const CLAUDE_MODEL_PREFIX = 'claude';
+
+const ERROR_MESSAGES = {
+  MISSING_API_KEY: 'LangDock API key not found. Please configure the API key in the .env.',
+  NO_CONTENT: 'No content received from API',
+  GENERATION_FAILED: 'Summary generation failed',
+} as const;
+
+// ============================================================================
+// Prompt Templates
+// ============================================================================
+
+/**
+ * Builds the German prompt template
+ */
+function buildGermanPrompt(transcript: string, customer_name: string, interlocutor: string): string {
+  return `You are a professional sales operations assistant for EMC.
 
 IMPORTANT CONTEXT ABOUT THE INPUT:
 - The input is NOT a verbatim call transcript.
 - The input IS a spoken voice note recorded by the sales agent AFTER the call.
 - The voice note describes what was discussed with the customer.
-- You MUST extract and structure the information based on the agent’s summary.
+- You MUST extract and structure the information based on the agent's summary.
 
 ADDITIONAL STRUCTURED INPUTS:
 - Client / Customer name: ${customer_name}
@@ -47,7 +82,7 @@ GERMAN SECTION TITLES (MUST BE USED EXACTLY — NO MODIFICATIONS ALLOWED):
 - Datum & Uhrzeit:
 - Wer hat mit wem gesprochen? (Name + Funktion beim Kunden)
 - Art des Kontakts: Telefon / E-Mail / Besuch
-- Kurz-Satz (Worum ging’s?):
+- Kurz-Satz (Worum ging's?):
 
 2. Kurze Zusammenfassung (Sales Summary)
 3–4 Bullet Points:
@@ -97,14 +132,19 @@ FINAL OUTPUT RULES:
 - NO extra text.
 - NO repetition of these rules.
 - NO structure changes.`;
-  } else {
-    return `You are a professional sales operations assistant for EMC.
+}
+
+/**
+ * Builds the English prompt template
+ */
+function buildEnglishPrompt(transcript: string, customer_name: string, interlocutor: string): string {
+  return `You are a professional sales operations assistant for EMC.
 
 IMPORTANT CONTEXT ABOUT THE INPUT:
 - The input is NOT a verbatim call transcript.
 - The input IS a spoken voice note recorded by the sales agent AFTER the call.
 - The voice note describes what was discussed with the customer.
-- You MUST extract and structure the information based on the agent’s summary.
+- You MUST extract and structure the information based on the agent's summary.
 
 ADDITIONAL STRUCTURED INPUTS:
 - Client / Customer name: ${customer_name}
@@ -175,120 +215,234 @@ FINAL OUTPUT RULES:
 - Do NOT add extra text.
 - Do NOT repeat these rules.
 - Do NOT change the structure.`;
-  }
-
 }
 
+/**
+ * Builds the summary prompt based on language
+ */
+function buildSummaryPrompt(
+  transcript: string,
+  language: string,
+  customer_name: string,
+  interlocutor: string
+): string {
+  const isGerman = language === 'german' || language === 'de';
+  return isGerman
+    ? buildGermanPrompt(transcript, customer_name, interlocutor)
+    : buildEnglishPrompt(transcript, customer_name, interlocutor);
+}
+
+// ============================================================================
+// API Configuration
+// ============================================================================
+
+/**
+ * Determines if a model is Anthropic Claude
+ */
+function isClaudeModel(model: string): boolean {
+  return model.toLowerCase().startsWith(CLAUDE_MODEL_PREFIX);
+}
+
+/**
+ * Builds API request configuration based on model type
+ */
+function buildApiConfig(
+  model: string,
+  prompt: string
+): ApiRequestConfig {
+  const isClaude = isClaudeModel(model);
+
+  if (isClaude) {
+    return {
+      url: `${LANGDOCK_API_BASE}/anthropic/${LANGDOCK_REGION}/v1/messages`,
+      body: {
+        model,
+        max_tokens: DEFAULT_MAX_TOKENS,
+        temperature: DEFAULT_TEMPERATURE,
+        messages: [{ role: 'user', content: prompt }],
+      },
+    };
+  }
+
+  return {
+    url: `${LANGDOCK_API_BASE}/openai/${LANGDOCK_REGION}/v1/chat/completions`,
+    body: {
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: DEFAULT_TEMPERATURE,
+      max_completion_tokens: DEFAULT_MAX_TOKENS,
+    },
+  };
+}
+
+// ============================================================================
+// Response Parsing
+// ============================================================================
+
+/**
+ * Parses API response from different provider formats
+ */
+function parseApiResponse(data: unknown): ParsedApiResponse {
+  if (!data || typeof data !== 'object') {
+    return {};
+  }
+
+  const response = data as Record<string, unknown>;
+
+  // Handle array response format
+  if (Array.isArray(response) && response.length > 0) {
+    const firstItem = response[0] as Record<string, unknown>;
+    return {
+      content: extractContent(firstItem),
+      usage: firstItem.usage,
+      model: firstItem.model as string | undefined,
+    };
+  }
+
+  // Handle Anthropic format
+  if ('content' in response) {
+    return {
+      content: extractContent(response),
+      usage: response.usage,
+      model: response.model as string | undefined,
+    };
+  }
+
+  // Handle OpenAI format
+  if ('choices' in response && Array.isArray(response.choices) && response.choices.length > 0) {
+    const choice = response.choices[0] as Record<string, unknown>;
+    const message = choice.message as Record<string, unknown>;
+    return {
+      content: message.content as string | undefined,
+      usage: response.usage,
+      model: response.model as string | undefined,
+    };
+  }
+
+  return {};
+}
+
+/**
+ * Extracts content from various response formats
+ */
+function extractContent(item: Record<string, unknown>): string | undefined {
+  // Handle content array (Anthropic format)
+  if (Array.isArray(item.content)) {
+    const firstContent = item.content[0] as Record<string, unknown>;
+    return firstContent.text as string | undefined;
+  }
+
+  // Handle content string
+  if (typeof item.content === 'string') {
+    return item.content;
+  }
+
+  // Handle direct text property
+  if (typeof item.text === 'string') {
+    return item.text;
+  }
+
+  return undefined;
+}
+
+// ============================================================================
+// Error Handling
+// ============================================================================
+
+/**
+ * Handles API error responses
+ */
+async function handleApiError(response: Response): Promise<ApiResponse> {
+  try {
+    const errorData = (await response.json()) as Record<string, unknown>;
+    const errorMessage =
+      (errorData.error as Record<string, unknown>)?.message ||
+      response.statusText ||
+      'Unknown API error';
+    return {
+      success: false,
+      error: `API Error: ${errorMessage}`,
+    };
+  } catch {
+    return {
+      success: false,
+      error: `API Error: ${response.statusText || 'Unknown error'}`,
+    };
+  }
+}
+
+/**
+ * Handles general errors
+ */
+function handleError(error: unknown): ApiResponse {
+  console.error('Summary generation error:', error);
+  const errorMessage =
+    error instanceof Error ? error.message : ERROR_MESSAGES.GENERATION_FAILED;
+  return {
+    success: false,
+    error: errorMessage,
+  };
+}
+
+// ============================================================================
+// Main Function
+// ============================================================================
+
+/**
+ * Generates a sales summary from a transcript using LangDock API
+ * @param params - Summary generation parameters
+ * @returns API response with generated summary or error
+ */
 export async function generateSummary(params: SummaryGenerationParams): Promise<ApiResponse> {
-  const apiKey = process.env.LANGDOCK_API_KEY || '';
+  const apiKey = process.env.LANGDOCK_API_KEY;
 
   if (!apiKey) {
     return {
       success: false,
-      error: 'LangDock API key not found. Please configure the API key in the .env file.'
+      error: ERROR_MESSAGES.MISSING_API_KEY,
     };
   }
 
-  const prompt = buildSummaryPrompt(params.transcript, params.language, params.customer_name, params.interlocutor);
-
-  const requestBody = {
-    model: params.selectedModel,
-    messages: [
-      {
-        role: 'user',
-        content: prompt
-      }
-    ],
-    temperature: 0.7,
-    max_completion_tokens: 3000
-  };
-
   try {
-    const region = 'eu';
-    const modelLower = (params.selectedModel || '').toLowerCase();
-    let apiUrl = '';
-    let finalBody: any = requestBody;
+    const prompt = buildSummaryPrompt(
+      params.transcript,
+      params.language,
+      params.customer_name,
+      params.interlocutor
+    );
 
-    if (modelLower.startsWith('claude')) {
-      // Anthropic via LangDock
-      apiUrl = `https://api.langdock.com/anthropic/${region}/v1/messages`;
-      finalBody = {
-        model: params.selectedModel,
-        max_tokens: 3000,
-        temperature: 0.7,
-        messages: [
-          { role: 'user', content: prompt }
-        ]
-      };
-    } else {
-      // OpenAI-compatible via LangDock
-      apiUrl = `https://api.langdock.com/openai/${region}/v1/chat/completions`;
-      finalBody = requestBody;
-    }
+    const { url, body } = buildApiConfig(params.selectedModel, prompt);
 
-    const response = await fetch(apiUrl, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify(finalBody)
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      return {
-        success: false,
-        error: `API Error: ${errorData.error?.message || response.statusText}`
-      };
+      return await handleApiError(response);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as unknown;
+    const parsed = parseApiResponse(data);
 
-    // Extract content from different provider schemas
-    let content: string | undefined;
-    let usage: any;
-    let model: string | undefined;
-
-    if (Array.isArray(data)) {
-      content = data[0]?.content?.[0]?.text || data[0]?.text;
-      usage = data[0]?.usage;
-      model = data[0]?.model;
-    } else if (data.content) {
-      // Anthropic format
-      if (Array.isArray(data.content)) {
-        content = data.content[0]?.text;
-      } else if (typeof data.content === 'string') {
-        content = data.content;
-      }
-      usage = data.usage;
-      model = data.model;
-    } else if (data.choices && Array.isArray(data.choices) && data.choices.length > 0) {
-      // OpenAI format
-      content = data.choices[0]?.message?.content;
-      usage = data.usage;
-      model = data.model;
-    }
-
-    if (!content) {
+    if (!parsed.content) {
       return {
         success: false,
-        error: 'No content received from API'
+        error: ERROR_MESSAGES.NO_CONTENT,
       };
     }
 
     return {
       success: true,
-      content: content.trim(),
-      usage,
-      model
+      content: parsed.content.trim(),
+      usage: parsed.usage,
+      model: parsed.model,
     };
   } catch (error) {
-    console.error('Summary generation error:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Summary generation failed'
-    };
+    return handleError(error);
   }
 }
-

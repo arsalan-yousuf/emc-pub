@@ -139,6 +139,17 @@ export default function LeftNavigation() {
     return Laptop;
   }, [theme]);
 
+  const roleLabel = useMemo(() => {
+    if (!role) return 'Staff';
+    const roleLabels: Record<string, string> = {
+      'super_admin': 'Super Admin',
+      'admin': 'Admin',
+      'sales_support': 'Sales Support',
+      'sales': 'Sales',
+    };
+    return roleLabels[role] || role;
+  }, [role]);
+
   return (
     <nav 
       className={`left-navigation ${isCollapsed ? 'collapsed' : 'expanded'}`}
@@ -200,6 +211,9 @@ export default function LeftNavigation() {
               <div className="nav-user-info">
                 <div className="nav-user-name" title={profile.email}>
                   {profile.name || profile.email?.split('@')[0] || 'Benutzer'}
+                </div>
+                <div className="nav-user-role" title={`Rolle: ${roleLabel}`}>
+                  {roleLabel}
                 </div>
                 {profile.email && profile.name && (
                   <div className="nav-user-email" title={profile.email}>

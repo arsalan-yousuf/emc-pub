@@ -77,12 +77,12 @@ function HistoryTab({ showToast, refreshTrigger = 0, onOpenSummaryModal, onReque
     try {
       await navigator.clipboard.writeText(text);
       const message = type === 'summary' 
-        ? 'Summary copied to clipboard!' 
-        : 'Transcript copied to clipboard!';
+        ? 'Zusammenfassung in die Zwischenablage kopiert!' 
+        : 'Transkript in die Zwischenablage kopiert!';
       showToast?.('success', message);
     } catch (error) {
       console.error('Failed to copy to clipboard:', error);
-      showToast?.('error', 'Failed to copy to clipboard');
+      showToast?.('error', 'In die Zwischenablage kopieren fehlgeschlagen');
     }
   };
 
