@@ -155,18 +155,24 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
       });
 
       if (result.success && result.content) {
-        setSummary(result.content);
-        setEditedSummary(result.content);
-        setIsEditingSummary(false);
-        showToast?.('success', SUCCESS_MESSAGES.GENERATED);
+        const content = result.content; // Store in variable for type safety
+        // Use same pattern as transcript: functional update and small delay to let DOM settle
+        // This matches how transcript is set via handleTranscription callback
+        setTimeout(() => {
+          setSummary(prev => content);
+          setEditedSummary(prev => content);
+          setIsEditingSummary(false);
+          setIsGenerating(false); // Now safe to set - button structure is consistent
+          showToast?.('success', SUCCESS_MESSAGES.GENERATED);
+        }, 0);
       } else {
+        setIsGenerating(false);
         showToast?.('error', result.error || 'Zusammenfassung konnte nicht generiert werden');
       }
     } catch (error) {
       console.error('Error generating summary:', error);
-      showToast?.('error', ERROR_MESSAGES.GENERATION_FAILED);
-    } finally {
       setIsGenerating(false);
+      showToast?.('error', ERROR_MESSAGES.GENERATION_FAILED);
     }
   }, [transcript, language, apiProvider, selectedModel, customerInfo, validateGeneration, showToast]);
 
@@ -472,19 +478,23 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
                 transition: 'all 0.3s ease'
               }}
             >
-              {isGenerating ? (
-                <>
-                  <span className="loading" style={{ marginRight: '8px' }}></span>
-                  Zusammenfassung wird generiert...
-                </>
-              ) : (
-                'Zusammenfassung generieren'
-              )}
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span 
+                  className="loading" 
+                  style={{ 
+                    marginRight: '8px', 
+                    display: isGenerating ? 'inline-block' : 'none' 
+                  }}
+                ></span>
+                <span>
+                  {isGenerating ? 'Zusammenfassung wird generiert...' : 'Zusammenfassung generieren'}
+                </span>
+              </span>
             </button>
           </div>
         )}
 
-        {/* Summary Display */}
+        {/* Summary Display - Use same conditional rendering pattern as transcript */}
         {summary && (
           <div 
             className="output-section" 
