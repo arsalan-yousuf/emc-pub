@@ -36,12 +36,12 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <UserProvider>
-            <div className="app-container">
-              <NavigationWrapper />
-              <main className="main-content">
-                {children}
-              </main>
-            </div>
+          <div className="app-container">
+            <NavigationWrapper />
+            <main className="main-content">
+              {children}
+            </main>
+          </div>
           </UserProvider>
         </ThemeProvider>
       </body>

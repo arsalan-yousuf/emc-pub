@@ -64,6 +64,33 @@ IMPORTANT CONTEXT ABOUT THE INPUT:
 - The voice note describes what was discussed with the customer.
 - You MUST extract and structure the information based on the agent's summary.
 
+CURRENT DATE & TIME CONTEXT:
+- Today’s date and time (reference for all relative dates): ${new Date().toISOString()}
+- Assume this datetime as the absolute reference point when resolving expressions like
+  “heute”, “morgen”, “nächste Woche”, “nächsten Mittwoch”, “in zwei Tagen”, etc.
+
+TEMPORAL NORMALIZATION RULES (MANDATORY):
+- Any relative date or time mentioned in the voice note MUST be converted into an exact date.
+- Examples:
+  - “morgen” → exact date based on today’s date
+  - “nächsten Mittwoch” → next calendar Wednesday after today
+  - “in zwei Wochen” → exact date
+  - “morgen um 17 Uhr” → exact date + time
+- If a date is mentioned without a time, omit the time.
+- If a time is mentioned without a date, infer the nearest reasonable future date.
+- If neither date nor time can be reasonably inferred, write exactly: "Nicht erwähnt".
+- Do NOT keep relative expressions in the final output.
+
+DATE & TIME OUTPUT FORMAT RULE (MANDATORY):
+- When writing dates and times in the final summary, use the following format ONLY:
+  YYYY-MM-DD HH:mm
+- Do NOT include milliseconds.
+- Do NOT include "T".
+- Do NOT include timezone indicators such as "Z".
+- Example:
+  Correct: 2025-12-22 10:55
+  Incorrect: 2025-12-22T10:55:36.461Z
+
 ADDITIONAL STRUCTURED INPUTS:
 - Client / Customer name: ${customer_name}
 - Interlocutor (person spoken to at customer): ${interlocutor}
@@ -138,13 +165,40 @@ FINAL OUTPUT RULES:
  * Builds the English prompt template
  */
 function buildEnglishPrompt(transcript: string, customer_name: string, interlocutor: string): string {
-  return `You are a professional sales operations assistant for EMC.
+  return `You are a professional sales operations assistant for E-M-C direct GmbH & Co. KG.
 
 IMPORTANT CONTEXT ABOUT THE INPUT:
 - The input is NOT a verbatim call transcript.
 - The input IS a spoken voice note recorded by the sales agent AFTER the call.
 - The voice note describes what was discussed with the customer.
 - You MUST extract and structure the information based on the agent's summary.
+
+CURRENT DATE & TIME CONTEXT:
+- Today’s date and time (reference for all relative dates): ${new Date().toISOString()}
+- Assume this datetime as the absolute reference point when resolving expressions like
+  “today”, “tomorrow”, “next week”, “next Wednesday”, “in two days”, etc.
+
+TEMPORAL NORMALIZATION RULES (MANDATORY):
+- Any relative date or time mentioned in the voice note MUST be converted into an exact date.
+- Examples:
+  - “Tomorrow” → calculate exact date based on today’s date
+  - “Next Wednesday” → calculate the next calendar Wednesday after today
+  - “In two weeks” → calculate the exact date
+  - “Tomorrow at 5pm” → calculate exact date + time
+- If a date is mentioned without a time, omit the time.
+- If a time is mentioned without a date, infer the nearest reasonable future date.
+- If neither date nor time can be reasonably inferred, write: "Not mentioned".
+- Do NOT keep relative expressions in the final output.
+
+DATE & TIME OUTPUT FORMAT RULE (MANDATORY):
+- When writing dates and times in the final summary, use the following format ONLY:
+  YYYY-MM-DD HH:mm
+- Do NOT include milliseconds.
+- Do NOT include "T".
+- Do NOT include timezone indicators such as "Z".
+- Example:
+  Correct: 2025-12-22 10:55
+  Incorrect: 2025-12-22T10:55:36.461Z
 
 ADDITIONAL STRUCTURED INPUTS:
 - Client / Customer name: ${customer_name}

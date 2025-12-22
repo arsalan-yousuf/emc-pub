@@ -3037,9 +3037,9 @@ body.no-navigation .main-content {
 
 .nav-user-role {
   font-size: 0.7em;
-  font-weight: 600;
-  color: hsl(var(--primary));
-  text-transform: uppercase;
+  font-weight: 500;
+  color: green;
+  text-transform: capitalize;
   letter-spacing: 0.5px;
   margin-top: 2px;
   margin-bottom: 2px;

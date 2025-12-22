@@ -25,6 +25,7 @@ export default function VoiceRecorder({
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const startTimeRef = useRef<number | null>(null);
 
   const startRecording = async () => {
     try {
@@ -50,10 +51,19 @@ export default function VoiceRecorder({
       mediaRecorder.start();
       setIsRecording(true);
       setRecordingDuration(0);
+      startTimeRef.current = Date.now();
       onRecordingStateChange?.(true);
       
+      // Use a more robust timer that calculates duration from start time
+      // This is less susceptible to browser extension interference
+      // Calculate from absolute time instead of incrementing to avoid missed updates
       recordingTimerRef.current = setInterval(() => {
-        setRecordingDuration(prev => prev + 1);
+        if (startTimeRef.current) {
+          const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+          setRecordingDuration(elapsed);
+        } else {
+          setRecordingDuration(prev => prev + 1);
+        }
       }, 1000);
     } catch (err) {
       console.error('Error starting recording:', err);
@@ -66,6 +76,7 @@ export default function VoiceRecorder({
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       onRecordingStateChange?.(false);
+      startTimeRef.current = null;
       
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
@@ -81,6 +92,7 @@ export default function VoiceRecorder({
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       setRecordingDuration(0);
+      startTimeRef.current = null;
       onRecordingStateChange?.(false);
       audioChunksRef.current = []; // Clear the audio chunks
       
@@ -122,6 +134,7 @@ export default function VoiceRecorder({
     }
     mediaRecorderRef.current = null;
     audioChunksRef.current = [];
+    startTimeRef.current = null;
     
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
@@ -148,12 +161,13 @@ export default function VoiceRecorder({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }} translate="no">
       <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
         <button
           type="button"
           onClick={handleClick}
           disabled={disabled || isProcessing}
+          translate="no"
           style={{
             width: '120px',
             height: '120px',
@@ -199,6 +213,7 @@ export default function VoiceRecorder({
           <button
             type="button"
             onClick={cancelRecording}
+            translate="no"
             style={{
               background: '#ff4757',
               color: 'white',
@@ -230,9 +245,13 @@ export default function VoiceRecorder({
         )}
       </div>
       
-      <div style={{ textAlign: 'center' }}>
+      <div style={{ textAlign: 'center' }} translate="no">
         {isRecording && (
-          <div style={{ fontSize: '18px', fontWeight: '600', color: '#ff6b6b', marginBottom: '8px' }}>
+          <div 
+            key={`timer-${recordingDuration}`}
+            style={{ fontSize: '18px', fontWeight: '600', color: '#ff6b6b', marginBottom: '8px' }}
+            suppressHydrationWarning
+          >
             Recording: {formatDuration(recordingDuration)}
           </div>
         )}

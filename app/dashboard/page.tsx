@@ -25,10 +25,10 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
 
   const loadProfiles = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await fetchDashboardProfiles();
+      setIsLoading(true);
+      setError(null);
+      try {
+        const data = await fetchDashboardProfiles();
       setState({
         profiles: data.profiles,
         selectedProfileId: data.initialProfileId,
@@ -36,15 +36,15 @@ export default function DashboardPage() {
         currentUrl: data.initialIframeUrl,
         isAdminView: data.isAdminView,
       });
-    } catch (err) {
-      console.error("Error loading dashboards:", err);
+      } catch (err) {
+        console.error("Error loading dashboards:", err);
       const errorMessage = err instanceof Error 
         ? err.message 
         : "Dashboard konnte nicht geladen werden. Bitte erneut versuchen.";
       setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
+      } finally {
+        setIsLoading(false);
+      }
   }, []);
 
   useEffect(() => {
@@ -154,13 +154,13 @@ export default function DashboardPage() {
       )}
 
       {state.currentUrl && state.currentDashboardId && (
-        <DashboardIframe
+      <DashboardIframe
           key={state.selectedProfileId}
           iframeKey={state.selectedProfileId as string}
           iframeUrl={state.currentUrl}
           dashboardId={state.currentDashboardId}
-          refreshDashboardUrl={refreshDashboardUrl}
-        />
+        refreshDashboardUrl={refreshDashboardUrl}
+      />
       )}
     </div>
   );

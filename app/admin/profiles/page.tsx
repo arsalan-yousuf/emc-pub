@@ -108,7 +108,7 @@ export default function AdminProfilesPage() {
   ): Promise<void> => {
     if (currentRole === newRole) return;
 
-    // Case 1: Assigning "No Role" - only revoke existing role
+    // Case 1: Assigning "Staff Member" - only revoke existing role
     if (!newRole && currentRole) {
       const revokeResult = await revokeRoleFromUser(profileId, currentRole);
       if (!revokeResult.success) {
@@ -120,7 +120,7 @@ export default function AdminProfilesPage() {
       return;
     }
 
-    // Case 2: Assigning role from "No Role" - only grant new role
+    // Case 2: Assigning role from "Staff Member" - only grant new role
     if (newRole && !currentRole) {
       const grantResult = await grantRoleToUser(profileId, newRole);
       if (!grantResult.success) {
@@ -480,7 +480,12 @@ export default function AdminProfilesPage() {
   // Show loading state while checking authorization or loading data
   if (!userState.isAuthorized || isLoading) {
     return (
-      <div className="main-container">
+      <div className="main-container" style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        minHeight: 'calc(100vh - 40px)'
+      }}>
         <div style={{ textAlign: 'center', padding: '40px' }}>
           <div className="loading" style={{ margin: '0 auto' }}></div>
           <p style={{ marginTop: '20px', color: 'var(--text-secondary)' }}>
@@ -756,7 +761,7 @@ export default function AdminProfilesPage() {
                             {profile.role.replace('_', ' ')}
                           </span>
                         ) : (
-                          <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Keine Rolle</span>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Staff Member</span>
                         )}
                       </td>
                       <td style={{ padding: '16px', textAlign: 'right', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>

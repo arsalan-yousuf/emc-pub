@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import VoiceRecorder from './VoiceRecorder';
 import { generateSummary } from '@/lib/summary-generator';
 import { saveSummary } from '@/lib/summaries-db';
-import { createClient } from '@/lib/supabase/client';
+import { useUser } from '@/contexts/UserContext';
 import { Edit2, Save, X } from 'lucide-react';
 
 // ============================================================================
@@ -51,6 +51,9 @@ const SUCCESS_MESSAGES = {
 // ============================================================================
 
 export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTabProps) {
+  // Get user from context
+  const { user } = useUser();
+  
   // State
   const [language, setLanguage] = useState<'german' | 'english'>('german');
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({
@@ -66,7 +69,6 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
   const [isRecording, setIsRecording] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
   const [apiProvider] = useState<'langdock'>('langdock');
   const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL);
 
@@ -75,21 +77,11 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
   // ============================================================================
 
   useEffect(() => {
-    const loadUser = async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (user) {
-        setUserId(user.id);
-      }
-    };
-
     const loadSettings = () => {
       const savedModel = localStorage.getItem(STORAGE_KEY_MODEL) || DEFAULT_MODEL;
       setSelectedModel(savedModel);
     };
 
-    loadUser();
     loadSettings();
   }, []);
 
@@ -196,21 +188,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
 
   const handleSaveSummary = useCallback(async () => {
     const summaryToSave = isEditingSummary ? editedSummary : summary;
-
-    // Fetch user directly if userId is not available (handles race condition)
-    let currentUserId = userId;
-    if (!currentUserId) {
-      try {
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          currentUserId = user.id;
-          setUserId(user.id); // Update state for future use
-        }
-      } catch (error) {
-        console.error('Error fetching user:', error);
-      }
-    }
+    const currentUserId = user?.id || null;
 
     if (!validateSave(summaryToSave, currentUserId)) return;
 
@@ -240,7 +218,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
     } finally {
       setIsSaving(false);
     }
-  }, [isEditingSummary, editedSummary, summary, userId, customerInfo, transcript, language, validateSave, resetForm, showToast, onSummarySaved]);
+  }, [isEditingSummary, editedSummary, summary, user?.id, customerInfo, transcript, language, validateSave, resetForm, showToast, onSummarySaved]);
 
   const handleCopySummary = useCallback(() => {
     navigator.clipboard.writeText(summary);
@@ -300,6 +278,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
               </label>
               <input
                 id="customerName"
+                translate="no"
                 type="text"
                 value={customerInfo.name}
                 onChange={(e) => updateCustomerInfo('name', e.target.value)}
@@ -322,6 +301,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
               </label>
               <input
                 id="customerPartner"
+                translate="no"
                 type="text"
                 value={customerInfo.partner}
                 onChange={(e) => updateCustomerInfo('partner', e.target.value)}
@@ -344,6 +324,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
               </label>
               <input
                 id="customerEmail"
+                translate="no"
                 type="email"
                 value={customerInfo.email}
                 onChange={(e) => updateCustomerInfo('email', e.target.value)}
@@ -365,6 +346,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
               </label>
               <input
                 id="customerPhone"
+                translate="no"
                 type="tel"
                 value={customerInfo.phone}
                 onChange={(e) => updateCustomerInfo('phone', e.target.value)}
@@ -450,6 +432,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
             </label>
             <textarea
               id="transcript"
+              translate="no"
               value={transcript}
               onChange={(e) => setTranscript(e.target.value)}
               rows={8}
@@ -503,7 +486,11 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
 
         {/* Summary Display */}
         {summary && (
-          <div className="output-section" style={{ display: 'block' }}>
+          <div 
+            className="output-section" 
+            style={{ display: 'block' }} 
+            translate="no"
+          >
             <div className="response-box">
               <div className="response-header">
                 <div>
@@ -515,11 +502,13 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
                       <button
                         className="copy-button"
                         onClick={handleCopySummary}
+                        translate="no"
                       >
                         Kopieren
                       </button>
                       <button
                         onClick={handleEditSummary}
+                        translate="no"
                         style={{
                           padding: '8px 16px',
                           background: 'var(--input-bg)',
@@ -540,6 +529,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
                       <button
                         onClick={handleSaveSummary}
                         disabled={isSaving}
+                        translate="no"
                         style={{
                           padding: '8px 16px',
                           background: 'var(--input-bg)',
@@ -559,6 +549,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
                     <>
                       <button
                         onClick={handleSaveEdit}
+                        translate="no"
                         style={{
                           padding: '8px 16px',
                           background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
@@ -578,6 +569,7 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
                       </button>
                       <button
                         onClick={handleCancelEdit}
+                        translate="no"
                         style={{
                           padding: '8px 16px',
                           background: 'var(--input-bg)',
@@ -600,34 +592,31 @@ export default function GeneratorTab({ showToast, onSummarySaved }: GeneratorTab
                 </div>
               </div>
               <div className="response-text">
-                {isEditingSummary ? (
-                  <textarea
-                    value={editedSummary}
-                    onChange={(e) => setEditedSummary(e.target.value)}
-                    style={{
-                      width: '100%',
-                      minHeight: '200px',
-                      padding: '12px',
-                      border: '2px solid var(--border-color)',
-                      borderRadius: '8px',
-                      fontSize: '15px',
-                      background: 'var(--input-bg)',
-                      color: 'var(--text-primary)',
-                      fontFamily: 'inherit',
-                      resize: 'vertical',
-                      lineHeight: '1.6',
-                      whiteSpace: 'pre-wrap',
-                      wordWrap: 'break-word'
-                    }}
-                  />
-                ) : (
-                  <pre style={{ 
-                    whiteSpace: 'pre-wrap', 
-                    wordWrap: 'break-word',
+                <textarea
+                  translate="no"
+                  value={isEditingSummary ? editedSummary : summary}
+                  readOnly={!isEditingSummary}
+                  onChange={(e) => setEditedSummary(e.target.value)}
+                  style={{
+                    width: '100%',
+                    minHeight: '200px',
+                    padding: '12px',
+                    border: isEditingSummary
+                      ? '2px solid var(--border-color)'
+                      : 'none',
+                    borderRadius: '8px',
+                    fontSize: '15px',
+                    background: 'var(--input-bg)',
+                    color: 'var(--text-primary)',
                     fontFamily: 'inherit',
-                    margin: 0
-                  }}>{summary}</pre>
-                )}
+                    resize: 'vertical',
+                    lineHeight: '1.6',
+                    whiteSpace: 'pre-wrap',
+                    wordWrap: 'break-word',
+                    cursor: isEditingSummary ? 'text' : 'default',
+                    outline: 'none'
+                  }}
+                />
               </div>
             </div>
           </div>

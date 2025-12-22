@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     if (!error && data.user) {
       // Check user role and redirect accordingly
       const userRole = await getUserRole(data.user.id);
-      // If user has no role, redirect to emailgen, otherwise use the specified redirect URL
+      // If user has no role (i.e. is a staff member), redirect to emailgen, otherwise use the specified redirect URL
       if (!userRole) {
         redirect("/emailgen");
       } else {

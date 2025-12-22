@@ -140,14 +140,14 @@ export default function LeftNavigation() {
   }, [theme]);
 
   const roleLabel = useMemo(() => {
-    if (!role) return 'Staff';
+    if (!role) return 'Staff Member';
     const roleLabels: Record<string, string> = {
       'super_admin': 'Super Admin',
       'admin': 'Admin',
       'sales_support': 'Sales Support',
       'sales': 'Sales',
     };
-    return roleLabels[role] || role;
+    return roleLabels[role] || 'Staff Member';
   }, [role]);
 
   return (

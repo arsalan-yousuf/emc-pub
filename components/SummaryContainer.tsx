@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import TabNavigation from './summaries/TabNavigation';
 import GeneratorTab from './summaries/GeneratorTab';
 import HistoryTab from './summaries/HistoryTab';
@@ -10,15 +10,17 @@ import DeleteConfirmationModal from './summaries/DeleteConfirmationModal';
 import { CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react';
 import { SummaryWithUser } from '@/lib/summaries-db';
 import { deleteSummary } from '@/lib/summaries-db';
-import { type UserRole } from '@/lib/user-roles';
-import { getUserRoleServer } from '@/lib/user-roles-server';
-import { createClient } from '@/lib/supabase/client';
+import { useUser } from '@/contexts/UserContext';
 
 interface SummaryContainerProps {
-  initialRole?: UserRole | null;
+  // initialRole prop kept for backward compatibility but no longer used
+  initialRole?: string | null;
 }
 
-export default function SummaryContainer({ initialRole = null }: SummaryContainerProps) {
+export default function SummaryContainer({ initialRole }: SummaryContainerProps) {
+  // Get user data from context
+  const { role, isLoading } = useUser();
+  
   const [activeTab, setActiveTab] = useState('generator');
   const [isMounted, setIsMounted] = useState(false);
   const [historyRefreshTrigger, setHistoryRefreshTrigger] = useState(0);
@@ -28,59 +30,18 @@ export default function SummaryContainer({ initialRole = null }: SummaryContaine
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [summaryToDelete, setSummaryToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [showViewSummaries, setShowViewSummaries] = useState(false);
-  const [userRole, setUserRole] = useState<UserRole | null>(initialRole ?? null);
-  
-  // Initialize with the role passed from parent (server-side fetch)
-  useEffect(() => {
-    if (initialRole) {
-      const hasAccess = initialRole === 'super_admin' || initialRole === 'admin' || initialRole === 'sales_support';
-      setShowViewSummaries(hasAccess);
-      setUserRole(initialRole);
-    }
-  }, [initialRole]);
+
+  // Use role from context
+  const userRole = role;
+
+  // Compute view access based on role
+  const showViewSummaries = useMemo(() => {
+    return userRole === 'super_admin' || userRole === 'admin' || userRole === 'sales_support';
+  }, [userRole]);
 
   useEffect(() => {
     setIsMounted(true);
-    
-    // Refetch role on client-side to update UI if role changed
-    // This ensures UI stays in sync even if role was assigned/removed after page load
-    const checkViewAccess = async () => {
-      try {
-        // Use server action instead of direct client call
-        const role = await getUserRoleServer();
-
-        // Show tab for super_admin, admin, or sales_support
-        const hasAccess = role === 'super_admin' || role === 'admin' || role === 'sales_support';
-        setShowViewSummaries(hasAccess);
-        setUserRole(role);
-      } catch (error) {
-        console.error('Error checking view access:', error);
-        // Don't override if we have initialRole
-        if (!initialRole) {
-          setShowViewSummaries(false);
-        }
-      }
-    };
-    
-    // Refetch after a short delay to update if role changed
-    const timeoutId = setTimeout(() => {
-      checkViewAccess();
-    }, 500);
-
-    // Listen to auth state changes to re-check access when user logs in/out
-    const supabase = createClient();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
-        checkViewAccess();
-      }
-    });
-
-    return () => {
-      clearTimeout(timeoutId);
-      subscription.unsubscribe();
-    };
-  }, [initialRole]);
+  }, []);
 
   const showToast = (type: 'success' | 'error' | 'warning' | 'info', message: string, duration: number = 3000) => {
     const id = Date.now().toString();
@@ -155,9 +116,11 @@ export default function SummaryContainer({ initialRole = null }: SummaryContaine
     setSummaryToDelete(null);
   };
 
-  const canManageSummaries = userRole === 'admin' || userRole === 'super_admin';
+  const canManageSummaries = useMemo(() => {
+    return userRole === 'admin' || userRole === 'super_admin';
+  }, [userRole]);
 
-  if (!isMounted) {
+  if (!isMounted || isLoading) {
     return (
       <div className="main-container">
         <div style={{ textAlign: 'center', padding: '40px' }}>

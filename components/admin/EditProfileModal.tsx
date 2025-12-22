@@ -107,7 +107,7 @@ export default function EditProfileModal({
 
   const roleOptions = useMemo(() => {
     const options = [
-      { value: '', label: 'No Role' },
+      { value: '', label: 'Staff Member' },
       { value: 'sales', label: 'Sales' },
       { value: 'sales_support', label: 'Sales Support' },
     ];

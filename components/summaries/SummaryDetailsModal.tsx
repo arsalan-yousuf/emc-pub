@@ -121,7 +121,7 @@ export default function SummaryDetailsModal({
   };
 
   return (
-    <div id="summaryDetailsModal" className="settings-modal" onClick={handleModalBackdropClick}>
+    <div id="summaryDetailsModal" className="settings-modal" onClick={handleModalBackdropClick} translate="no">
       <div className="settings-modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="settings-header">
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -188,7 +188,7 @@ export default function SummaryDetailsModal({
           </div>
         </div>
         <div className="settings-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-          <div className="detail-section">
+          <div className="detail-section" translate="no">
             <h4>Kundeninformationen:</h4>
             {isEditing ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -281,59 +281,59 @@ export default function SummaryDetailsModal({
           </div>
           <div className="detail-section">
             <h4>Transkript:</h4>
-            {isEditing ? (
-              <textarea
-                value={editedData.transcript}
-                onChange={(e) => setEditedData({ ...editedData, transcript: e.target.value })}
-                style={{
-                  width: '100%',
-                  minHeight: '150px',
-                  padding: '12px',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '6px',
-                  background: 'var(--input-bg)',
-                  color: 'var(--text-primary)',
-                  fontSize: '14px',
-                  fontFamily: 'inherit',
-                  resize: 'vertical',
-                  lineHeight: '1.6',
-                  whiteSpace: 'pre-wrap',
-                  wordWrap: 'break-word'
-                }}
-              />
-            ) : (
-              <div className="email-content">
-                <pre style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>{selectedItem.transcript}</pre>
-              </div>
-            )}
+            <textarea
+              translate="no"
+              value={isEditing ? editedData.transcript : selectedItem.transcript}
+              readOnly={!isEditing}
+              onChange={(e) => setEditedData({ ...editedData, transcript: e.target.value })}
+              style={{
+                width: '100%',
+                minHeight: '150px',
+                padding: '12px',
+                border: isEditing
+                  ? '1px solid var(--border-color)'
+                  : 'none',
+                borderRadius: '6px',
+                background: 'var(--input-bg)',
+                color: 'var(--text-primary)',
+                fontSize: '14px',
+                fontFamily: 'inherit',
+                resize: 'vertical',
+                lineHeight: '1.6',
+                whiteSpace: 'pre-wrap',
+                wordWrap: 'break-word',
+                cursor: isEditing ? 'text' : 'default',
+                outline: 'none'
+              }}
+            />
           </div>
           <div className="detail-section">
             <h4>Zusammenfassung:</h4>
-            {isEditing ? (
-              <textarea
-                value={editedData.summary}
-                onChange={(e) => setEditedData({ ...editedData, summary: e.target.value })}
-                style={{
-                  width: '100%',
-                  minHeight: '200px',
-                  padding: '12px',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '6px',
-                  background: 'var(--input-bg)',
-                  color: 'var(--text-primary)',
-                  fontSize: '14px',
-                  fontFamily: 'inherit',
-                  resize: 'vertical',
-                  lineHeight: '1.6',
-                  whiteSpace: 'pre-wrap',
-                  wordWrap: 'break-word'
-                }}
-              />
-            ) : (
-              <div className="email-content">
-                <pre style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>{selectedItem.summary}</pre>
-              </div>
-            )}
+            <textarea
+              translate="no"
+              value={isEditing ? editedData.summary : selectedItem.summary}
+              readOnly={!isEditing}
+              onChange={(e) => setEditedData({ ...editedData, summary: e.target.value })}
+              style={{
+                width: '100%',
+                minHeight: '200px',
+                padding: '12px',
+                border: isEditing
+                  ? '1px solid var(--border-color)'
+                  : 'none',
+                borderRadius: '6px',
+                background: 'var(--input-bg)',
+                color: 'var(--text-primary)',
+                fontSize: '14px',
+                fontFamily: 'inherit',
+                resize: 'vertical',
+                lineHeight: '1.6',
+                whiteSpace: 'pre-wrap',
+                wordWrap: 'break-word',
+                cursor: isEditing ? 'text' : 'default',
+                outline: 'none'
+              }}
+            />
           </div>
           {!isEditing && (
             <div className="detail-actions">
