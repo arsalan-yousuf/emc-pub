@@ -54,6 +54,11 @@ export interface ActionResult {
   error?: string;
 }
 
+export interface RoleResult {
+  success: boolean;
+  error?: string;
+}
+
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -131,6 +136,19 @@ function createAdminClient() {
       persistSession: false,
     },
   });
+}
+
+/**
+ * Check if an error is a duplicate key error (used for role mutations)
+ */
+function isDuplicateKeyError(error: { message?: string; code?: string } | Error): boolean {
+  const message = error instanceof Error ? error.message : error.message || "";
+  const code = "code" in error ? (error as any).code : undefined;
+  return (
+    message.includes("duplicate key") ||
+    message.includes("already exists") ||
+    code === "23505"
+  );
 }
 
 /**
@@ -220,6 +238,64 @@ export async function deleteUserAccount(userId: string): Promise<ActionResult> {
     const errorMessage = error instanceof Error 
       ? error.message 
       : "Failed to delete user";
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Grant a role to a user (server-side, calls the database function)
+ * Uses the authenticated Supabase server client (cookie-based auth).
+ */
+export async function grantRoleToUser(userId: string, role: UserRole): Promise<RoleResult> {
+  try {
+    const supabase = await createClient();
+
+    const { error } = await supabase.rpc("grant_role", {
+      p_target: userId,
+      p_role: role,
+    });
+
+    if (error) {
+      // If the error is about duplicate key, the role already exists - that's okay
+      if (isDuplicateKeyError(error)) {
+        return { success: true };
+      }
+      console.error("Error granting role:", error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error granting role:", error);
+    if (error instanceof Error && isDuplicateKeyError(error)) {
+      return { success: true };
+    }
+    const errorMessage = error instanceof Error ? error.message : "Failed to grant role";
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Revoke a role from a user (server-side, calls the database function)
+ */
+export async function revokeRoleFromUser(userId: string, role: UserRole): Promise<RoleResult> {
+  try {
+    const supabase = await createClient();
+
+    const { error } = await supabase.rpc("revoke_role", {
+      p_target: userId,
+      p_role: role,
+    });
+
+    if (error) {
+      console.error("Error revoking role:", error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error revoking role:", error);
+    const errorMessage = error instanceof Error ? error.message : "Failed to revoke role";
     return { success: false, error: errorMessage };
   }
 }
