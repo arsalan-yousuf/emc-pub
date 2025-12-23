@@ -145,30 +145,22 @@
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
 
-"use client"
+// app/page.tsx (Server Component)
+import { getUserRoleServer } from "@/lib/user-roles-server"; // server-side function
+import { redirect } from "next/navigation";
 
-import { useUser } from "@/contexts/UserContext"
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
+export default async function Home() {
+  const user = await getUserRoleServer();
+  console.log("user in page.tsx", user)
+  if (!user) {
+    return redirect("/auth/login");
+  }
 
-export default function Home() {
-  const { user, role, isLoading } = useUser()
-  const router = useRouter()
-
-  useEffect(() => {
-    if (!isLoading) {
-      if (!user) {
-        router.replace("/auth/login")
-      } else {
-        if (role === "super_admin" || role === "admin" || role === "sales_support" || role === "sales") {
-          router.replace("/dashboard")
-        } else {
-          router.replace("/emailgen")
-        }
-      }
-    }
-  }, [user, role, isLoading, router])
-
-  // While loading or redirecting, show nothing (or a loader)
-  return null
+  const role = user; // or get role from DB
+  console.log("role in page.tsx", role)
+  if (role === "super_admin" || role === "admin" || role === "sales_support" || role === "sales") {
+    return redirect("/dashboard");
+  } else {
+    return redirect("/emailgen");
+  }
 }
