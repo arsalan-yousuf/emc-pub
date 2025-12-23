@@ -158,13 +158,15 @@ export default function LeftNavigation() {
       <div className="nav-content">
         {/* App Title */}
         <div className="nav-header">
-          {!isCollapsed ? (
-            // <h2 className="nav-title">EMC Sales</h2>
-            <Image src="/EMC_Logo-removebg.png" alt="EMC Sales Logo" width={120} height={50} />
-          ) : (
-            // <div className="nav-title-icon">EMC</div>
-            <Image src="/EMC_Logo-removebg.png" alt="EMC Sales Logo" width={50} height={30} />
-          )}
+          <Link href="/" className="nav-logo-link">
+            {!isCollapsed ? (
+              // <h2 className="nav-title">EMC Sales</h2>
+              <Image src="/EMC_Logo-removebg.png" alt="EMC Sales Logo" width={120} height={50} />
+            ) : (
+              // <div className="nav-title-icon">EMC</div>
+              <Image src="/EMC_Logo-removebg.png" alt="EMC Sales Logo" width={50} height={30} />
+            )}
+          </Link>
         </div>
 
         {/* Toggle Button */}
