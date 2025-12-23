@@ -1,13 +1,19 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { getUserRoles, getUserRole, type UserRole } from '@/lib/user-roles';
 import { fetchCurrentProfile } from '@/lib/profiles-server';
 
-// ============================================================================
-// Type Definitions
-// ============================================================================
+/* ============================================================================
+ * Types
+ * ==========================================================================*/
 
 interface UserProfile {
   email?: string;
@@ -24,160 +30,169 @@ interface UserContextType {
   roles: UserRole[];
   isAdmin: boolean;
   isSuperAdmin: boolean;
-  isLoading: boolean;
+  isLoading: boolean; // AUTH loading only (fast)
   refreshUserData: () => Promise<void>;
 }
 
-// ============================================================================
-// Context
-// ============================================================================
+/* ============================================================================
+ * Context
+ * ==========================================================================*/
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-// ============================================================================
-// Provider Component
-// ============================================================================
+/* ============================================================================
+ * Provider
+ * ==========================================================================*/
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<{ id: string; email?: string | null } | null>(null);
+  const supabase = createClient();
+
+  const [user, setUser] = useState<UserContextType['user']>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  // IMPORTANT: this only tracks AUTH readiness
   const [isLoading, setIsLoading] = useState(true);
 
-  /**
-   * Formats user's full name from profile or metadata
-   */
-  const formatUserName = useCallback((
-    profileData: { first_name?: string | null; last_name?: string | null } | null | undefined,
-    authUser: { email?: string | null; user_metadata?: Record<string, any> } | null
-  ): string => {
-    if (profileData?.first_name && profileData?.last_name) {
-      return `${profileData.first_name} ${profileData.last_name}`;
-    }
-    if (profileData?.first_name || profileData?.last_name) {
-      return profileData.first_name || profileData.last_name || '';
-    }
-    if (authUser?.user_metadata?.full_name) {
-      return authUser.user_metadata.full_name;
-    }
-    if (authUser?.user_metadata?.name) {
-      return authUser.user_metadata.name;
-    }
-    if (authUser?.email) {
-      return authUser.email.split('@')[0];
-    }
-    return 'Benutzer';
-  }, []);
+  /* ============================================================================
+   * Helpers
+   * ==========================================================================*/
 
-  /**
-   * Fetches and updates all user data (profile, roles, admin status)
-   */
+  const formatUserName = useCallback(
+    (
+      profileData:
+        | { first_name?: string | null; last_name?: string | null }
+        | null
+        | undefined,
+      authUser: { email?: string | null; user_metadata?: any } | null
+    ): string => {
+      if (profileData?.first_name || profileData?.last_name) {
+        return `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim();
+      }
+      if (authUser?.user_metadata?.full_name) return authUser.user_metadata.full_name;
+      if (authUser?.email) return authUser.email.split('@')[0];
+      return 'Benutzer';
+    },
+    []
+  );
+
+  /* ============================================================================
+   * Fetch profile + roles (NON-BLOCKING)
+   * ==========================================================================*/
+
+  const fetchUserDetails = useCallback(
+    async (authUser: { id: string; email?: string | null }) => {
+      try {
+        const [profileResult, fetchedRoles] = await Promise.all([
+          fetchCurrentProfile(),
+          getUserRoles(), // no long timeout
+        ]);
+
+        const profileData = profileResult.success
+          ? profileResult.profile
+          : null;
+
+        setProfile({
+          email: authUser.email || undefined,
+          name: formatUserName(profileData, authUser),
+          first_name: profileData?.first_name || undefined,
+          last_name: profileData?.last_name || undefined,
+          dashboard_id: profileData?.metabase_dashboard_id || undefined,
+        });
+
+        setRoles(fetchedRoles);
+
+        const isSuper = fetchedRoles.includes('super_admin');
+        const isAdm = isSuper || fetchedRoles.includes('admin');
+
+        setIsSuperAdmin(isSuper);
+        setIsAdmin(isAdm);
+
+        // Primary role
+        if (fetchedRoles.length > 0) {
+          setRole(fetchedRoles[0]);
+        } else {
+          const fallbackRole = await getUserRole(authUser.id);
+          setRole(fallbackRole);
+        }
+      } catch (err) {
+        console.error('Failed to fetch user details:', err);
+      }
+    },
+    [formatUserName]
+  );
+
+  /* ============================================================================
+   * Refresh (manual trigger)
+   * ==========================================================================*/
+
   const refreshUserData = useCallback(async () => {
-    try {
-      const supabase = createClient();
-      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError || !authUser) {
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
+
+    if (!authUser) return;
+
+    setUser(authUser);
+    fetchUserDetails(authUser);
+  }, [fetchUserDetails, supabase]);
+
+  /* ============================================================================
+   * Auth bootstrap (FAST)
+   * ==========================================================================*/
+
+  useEffect(() => {
+    let isActive = true;
+
+    const initAuth = async () => {
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
+
+      if (!isActive) return;
+
+      if (authUser) {
+        setUser(authUser);
+        setIsLoading(false); // ✅ auth ready immediately
+        fetchUserDetails(authUser); // background
+      } else {
+        setUser(null);
+        setIsLoading(false);
+      }
+    };
+
+    initAuth();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!isActive) return;
+
+      if (session?.user) {
+        setUser(session.user);
+        fetchUserDetails(session.user);
+      } else {
         setUser(null);
         setProfile(null);
         setRole(null);
         setRoles([]);
         setIsAdmin(false);
         setIsSuperAdmin(false);
-        setIsLoading(false);
-        return;
       }
-
-      setUser(authUser);
-
-      // Fetch profile and roles in parallel
-      const [profileResult, userRoles] = await Promise.all([
-        fetchCurrentProfile(),
-        getUserRoles(10000), // Use longer timeout for initial fetch
-      ]);
-
-      const profileData = profileResult.success ? profileResult.profile : null;
-      const fullName = formatUserName(profileData, authUser);
-
-      // Set profile
-      setProfile({
-        email: authUser.email || undefined,
-        name: fullName,
-        first_name: profileData?.first_name || undefined,
-        last_name: profileData?.last_name || undefined,
-        dashboard_id: profileData?.metabase_dashboard_id || undefined,
-      });
-
-      // Set roles
-      setRoles(userRoles);
-      const isSuperAdminValue = userRoles.includes('super_admin');
-      const isAdminValue = isSuperAdminValue || userRoles.includes('admin');
-      setIsSuperAdmin(isSuperAdminValue);
-      setIsAdmin(isAdminValue);
-
-      // Get primary role (first role found, or fetch via getUserRole as fallback)
-      const primaryRole = userRoles.length > 0 ? userRoles[0] : await getUserRole(authUser.id);
-      setRole(primaryRole);
-
-      setIsLoading(false);
-    } catch (error) {
-      console.error('Error refreshing user data:', error);
-      setIsLoading(false);
-      // Don't clear user data on error, just log it
-    }
-  }, [formatUserName]);
-
-  // Initial fetch and auth state listener
-  useEffect(() => {
-    let isMounted = true;
-
-    const initializeUser = async () => {
-      const supabase = createClient();
-      
-      // Get initial user
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      
-      if (!isMounted) return;
-
-      if (authUser) {
-        await refreshUserData();
-      } else {
-        setIsLoading(false);
-      }
-
-      // Listen for auth changes
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (!isMounted) return;
-
-        if (session?.user) {
-          // User logged in - fetch role immediately
-          await refreshUserData();
-        } else {
-          // User logged out
-          setUser(null);
-          setProfile(null);
-          setRole(null);
-          setRoles([]);
-          setIsAdmin(false);
-          setIsSuperAdmin(false);
-          setIsLoading(false);
-        }
-      });
-
-      return () => {
-        subscription.unsubscribe();
-      };
-    };
-
-    initializeUser();
+    });
 
     return () => {
-      isMounted = false;
+      isActive = false;
+      subscription.unsubscribe();
     };
-  }, [refreshUserData]);
+  }, [fetchUserDetails, supabase]);
+
+  /* ============================================================================
+   * Context value
+   * ==========================================================================*/
 
   const value: UserContextType = {
     user,
@@ -193,15 +208,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }
 
-// ============================================================================
-// Hook
-// ============================================================================
+/* ============================================================================
+ * Hook
+ * ==========================================================================*/
 
 export function useUser() {
   const context = useContext(UserContext);
-  if (context === undefined) {
-    throw new Error('useUser must be used within a UserProvider');
+  if (!context) {
+    throw new Error('useUser must be used within UserProvider');
   }
   return context;
 }
-
