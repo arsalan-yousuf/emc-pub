@@ -261,8 +261,6 @@ export async function generateEmail(params: EmailGenerationParams): Promise<ApiR
       model: model
     };
     
-    console.log('API Provider:', params.apiProvider, 'Model:', params.selectedModel);
-    console.log('Token Usage:', usage);
     return result;
   } catch (error) {
     console.error('API request error:', error);
@@ -490,9 +488,7 @@ export async function improveEmail(params: EmailImprovementParams): Promise<ApiR
       usage: usage,
       model: model
     };
-    
-    console.log('Email Improvement - API Provider:', params.apiProvider, 'Model:', params.selectedModel);
-    console.log('Token Usage:', usage);
+
     return result;
   } catch (error) {
     console.error('API request error:', error);

@@ -115,8 +115,6 @@ export default function AdminProfilesPage() {
     newRole: UserRole | null
   ): Promise<void> => {
     if (currentRole === newRole) return;
-    console.log('currentRole', currentRole);
-    console.log('newRole', newRole);
     // Case 1: Assigning "Staff Member" - only revoke existing role
     if (!newRole && currentRole) {
       const revokeResult = await revokeRoleFromUser(profileId, currentRole);
@@ -421,7 +419,6 @@ export default function AdminProfilesPage() {
 
   const handleSaveProfile = useCallback(async (updatedData: ProfileUpdateData) => {
     const profile = modalState.editingProfile;
-    console.log('updatedData handleSaveProfile', updatedData);
     if (!profile) return;
 
     // Double-check permissions before saving
@@ -431,7 +428,6 @@ export default function AdminProfilesPage() {
       return;
     }
 
-    console.log('userState handleSaveProfile', userState);
 
     // Prevent admins from assigning admin or super_admin roles to other users
     const isEditingOwnProfile = userState.userId && profile.id === userState.userId;
@@ -454,7 +450,6 @@ export default function AdminProfilesPage() {
     setIsSaving(true);
     setError(null);
     setSuccess(null);
-    console.log("After state update handleSaveProfile");
     try {
       // Update profile data
       const updateResult = await updateUserProfile(profile.id, {
@@ -464,7 +459,6 @@ export default function AdminProfilesPage() {
         metabase_dashboard_id: updatedData.metabase_dashboard_id,
       });
 
-      console.log('updateResult handleSaveProfile', updateResult);
 
       if (!updateResult.success) {
         throw new Error(updateResult.error || 'Profil konnte nicht aktualisiert werden');
@@ -472,7 +466,6 @@ export default function AdminProfilesPage() {
 
       // Handle role change if different
       await handleRoleChange(profile.id, profile.role, updatedData.role);
-      console.log('handleRoleChange done handleSaveProfile');
       showSuccess('Profil erfolgreich aktualisiert');
       await loadProfiles();
       setModalState(prev => ({ ...prev, editingProfile: null }));

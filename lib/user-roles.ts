@@ -156,7 +156,6 @@ export async function getUserRole(userId: string, useServerClient: boolean = fal
     const supabase = useServerClient 
       ? await createServerClient()
       : createBrowserClient();
-    
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     
     // Try direct query first
@@ -166,7 +165,6 @@ export async function getUserRole(userId: string, useServerClient: boolean = fal
       .eq('user_id', userId)
       .limit(1)
       .maybeSingle();
-    
     if (!error && data?.role && isValidRole(data.role)) {
       return data.role;
     }
