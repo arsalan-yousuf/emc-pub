@@ -9,28 +9,20 @@ export default function NavigationWrapper() {
   const pathname = usePathname();
   const { user, isLoading } = useUser();
   
-  // Hide navigation on auth pages
-  const isAuthPage = pathname?.startsWith('/auth');
-  
-  // Hide navigation on root page only if user is not authenticated
-  const shouldHideOnRoot = pathname === '/' && (!user || isLoading);
+  // Hide navigation on auth pages and root page
+  const isAuthPage = pathname?.startsWith('/auth') || pathname === '/';
   
   useEffect(() => {
     // Add/remove class to body based on navigation visibility
-    if (isAuthPage || shouldHideOnRoot) {
+    if (isAuthPage || !user) {
       document.body.classList.add('no-navigation');
     } else {
       document.body.classList.remove('no-navigation');
     }
-  }, [isAuthPage, shouldHideOnRoot]);
+  }, [isAuthPage, user]);
   
   // Don't show navigation on auth pages
   if (isAuthPage) {
-    return null;
-  }
-  
-  // Don't show navigation on root page if user is not authenticated
-  if (shouldHideOnRoot) {
     return null;
   }
   
@@ -39,7 +31,7 @@ export default function NavigationWrapper() {
     return null;
   }
   
-  // Show navigation for authenticated users (including on root page)
+  // Show navigation for authenticated users
   return <LeftNavigation />;
 }
 

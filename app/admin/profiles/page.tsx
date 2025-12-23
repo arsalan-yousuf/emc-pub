@@ -57,6 +57,8 @@ const SUCCESS_DISPLAY_DURATION = 3000;
 export default function AdminProfilesPage() {
   const router = useRouter();
   const isLoadingRef = useRef(false);
+  const hasLoadedProfilesRef = useRef(false);
+  const lastLoadedUserIdRef = useRef<string | null>(null);
   const { isAdmin: userIsAdmin, isSuperAdmin: userIsSuperAdmin, isLoading: userContextLoading, user } = useUser();
 
   // State management
@@ -208,9 +210,6 @@ export default function AdminProfilesPage() {
       }
 
       try {
-        setIsLoading(true);
-        setError(null);
-
         // Check authorization using context values (no API calls needed)
         if (!userIsAdmin) {
           if (!isMounted) return;
@@ -220,15 +219,28 @@ export default function AdminProfilesPage() {
 
         if (!isMounted) return;
 
+        const currentUserId = user?.id || null;
+        const userIdChanged = lastLoadedUserIdRef.current !== currentUserId;
+        
+        // Only set loading state if we haven't loaded profiles yet or user changed
+        if (!hasLoadedProfilesRef.current || userIdChanged) {
+          setIsLoading(true);
+        }
+        setError(null);
+
         setUserState(prev => ({ 
           ...prev, 
           isAuthorized: true,
           isSuperAdmin: userIsSuperAdmin,
-          userId: user?.id || null
+          userId: currentUserId
         }));
         
-        // Load profiles
-        await loadProfiles();
+        // Only load profiles if we haven't loaded them yet or user changed
+        if (!hasLoadedProfilesRef.current || userIdChanged) {
+          await loadProfiles();
+          hasLoadedProfilesRef.current = true;
+          lastLoadedUserIdRef.current = currentUserId;
+        }
       } catch (err) {
         if (!isMounted) return;
 
@@ -246,8 +258,9 @@ export default function AdminProfilesPage() {
     return () => {
       isMounted = false;
     };
+    // Only depend on values that should trigger a re-check of authorization
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userContextLoading, userIsAdmin, userIsSuperAdmin, user, loadProfiles, router]);
+  }, [userContextLoading, userIsAdmin, user?.id, router]);
 
   // Manual refresh handler
   const handleRefresh = useCallback(async () => {
@@ -256,6 +269,9 @@ export default function AdminProfilesPage() {
     setIsRefreshing(true);
     try {
       await loadProfiles();
+      // Update refs after successful refresh
+      hasLoadedProfilesRef.current = true;
+      lastLoadedUserIdRef.current = user?.id || null;
       showSuccess('Profile erfolgreich aktualisiert');
     } catch (err) {
       console.error('Error refreshing profiles:', err);
@@ -263,7 +279,7 @@ export default function AdminProfilesPage() {
     } finally {
       setIsRefreshing(false);
     }
-  }, [userState.isAuthorized, isLoading, isRefreshing, loadProfiles, showSuccess, showError]);
+  }, [userState.isAuthorized, isLoading, isRefreshing, loadProfiles, showSuccess, showError, user?.id]);
 
   // Filter and sort profiles
   const filteredAndSortedProfiles = useMemo(() => {
@@ -392,6 +408,9 @@ export default function AdminProfilesPage() {
       }
       showSuccess('Benutzer erfolgreich gelöscht');
       await loadProfiles();
+      // Update refs after successful deletion
+      hasLoadedProfilesRef.current = true;
+      lastLoadedUserIdRef.current = user?.id || null;
     } catch (err) {
       console.error('Error deleting user:', err);
       const errorMessage = err instanceof Error ? err.message : 'Benutzer konnte nicht gelöscht werden';
@@ -399,7 +418,7 @@ export default function AdminProfilesPage() {
     } finally {
       setModalState(prev => ({ ...prev, deletingUserId: null }));
     }
-  }, [modalState.userToDelete, userState.isSuperAdmin, userState.userId, showError, showSuccess, loadProfiles]);
+  }, [modalState.userToDelete, userState.isSuperAdmin, userState.userId, showError, showSuccess, loadProfiles, user?.id]);
 
   const openDeleteModal = useCallback((profile: ProfileWithRole) => {
     setModalState(prev => ({
@@ -468,6 +487,9 @@ export default function AdminProfilesPage() {
       await handleRoleChange(profile.id, profile.role, updatedData.role);
       showSuccess('Profil erfolgreich aktualisiert');
       await loadProfiles();
+      // Update refs after successful save
+      hasLoadedProfilesRef.current = true;
+      lastLoadedUserIdRef.current = user?.id || null;
       setModalState(prev => ({ ...prev, editingProfile: null }));
     } catch (err) {
       console.error('Error updating profile:', err);
@@ -477,7 +499,7 @@ export default function AdminProfilesPage() {
     } finally {
       setIsSaving(false);
     }
-  }, [modalState.editingProfile, userState, canEditProfile, handleRoleChange, showError, showSuccess, loadProfiles]);
+  }, [modalState.editingProfile, userState, canEditProfile, handleRoleChange, showError, showSuccess, loadProfiles, user?.id]);
 
 
   // ============================================================================

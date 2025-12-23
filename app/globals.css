@@ -2681,23 +2681,6 @@ body.dark-mode #simpleLanguage:focus {
   min-height: 50px;
 }
 
-.nav-logo-link {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-  cursor: pointer;
-}
-
-.nav-logo-link:hover {
-  opacity: 0.8;
-  transform: scale(1.05);
-}
-
-.nav-logo-link:active {
-  transform: scale(0.98);
-}
-
 .nav-title {
   font-size: 1.5em;
   font-weight: 700;
