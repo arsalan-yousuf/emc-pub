@@ -2,10 +2,11 @@
 
 import { useUser } from "@/contexts/UserContext"
 import Link from "next/link"
+import { redirect } from "next/navigation"
 
 export default function Home() {
   const { user, profile, role, isLoading } = useUser()
-
+  console.log("role in page.tsx", role)
   // Show loading state while checking authentication
   if (isLoading) {
     return (
@@ -20,24 +21,34 @@ export default function Home() {
 
   // If user is not authenticated, show login prompt
   if (!user) {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-        <div className="text-center px-6 max-w-2xl">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 md:p-12">
-            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
-              Willkommen bei EMC Sales Cockpit
-            </h1>
-            <p className="text-lg text-gray-600 dark:text-gray-400 mb-8">Bitte melden Sie sich an, um fortzufahren</p>
-            <Link
-              href="/auth/login"
-              className="inline-block px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl"
-            >
-              Zur Anmeldung
-            </Link>
-          </div>
-        </div>
-      </main>
-    )
+    // redirect to login page
+    redirect("/auth/login")
+    // return (
+    //   <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+    //     <div className="text-center px-6 max-w-2xl">
+    //       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 md:p-12">
+    //         <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
+    //           Willkommen bei EMC Sales Cockpit
+    //         </h1>
+    //         <p className="text-lg text-gray-600 dark:text-gray-400 mb-8">Bitte melden Sie sich an, um fortzufahren</p>
+    //         <Link
+    //           href="/auth/login"
+    //           className="inline-block px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl"
+    //         >
+    //           Zur Anmeldung
+    //         </Link>
+    //       </div>
+    //     </div>
+    //   </main>
+    // )
+  }
+  else{
+    if(role === "sales_support" || role === "sales" || role === "super_admin" || role === "admin"){
+      redirect("/dashboard")
+    }
+    else{
+      redirect("/emailgen")
+    }
   }
 
   const userName = profile?.name || profile?.first_name || user?.email?.split("@")[0] || "Benutzer"

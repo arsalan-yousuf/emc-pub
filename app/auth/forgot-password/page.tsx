@@ -1,11 +1,13 @@
 import { ForgotPasswordForm } from "@/components/forgot-password-form";
+import { AuthLayout } from "@/components/auth/auth-layout";
 
 export default function Page() {
   return (
-    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
-      <div className="w-full max-w-sm">
+    <AuthLayout
+      title="E-M-C Sales Cockpit"
+      subtitle="Setzen Sie Ihr Passwort zurück"
+    >
         <ForgotPasswordForm />
-      </div>
-    </div>
+    </AuthLayout>
   );
 }
