@@ -12,7 +12,7 @@ import {
   revokeRoleFromUser,
 } from '@/lib/profiles-server';
 import { useRouter } from 'next/navigation';
-import { Edit2, Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { Edit2, Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, AlertCircle, CheckCircle2, } from 'lucide-react';
 import EditProfileModal from '@/components/admin/EditProfileModal';
 import DeleteConfirmationModal from '@/components/summaries/DeleteConfirmationModal';
 import { useUser } from '@/contexts/UserContext';
@@ -509,45 +509,35 @@ export default function AdminProfilesPage() {
   // Show loading state while checking authorization or loading data
   if (!userState.isAuthorized || isLoading) {
     return (
-      <div className="main-container" style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        minHeight: 'calc(100vh - 40px)'
-      }}>
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <div className="loading" style={{ margin: '0 auto' }}></div>
-          <p style={{ marginTop: '20px', color: 'var(--text-secondary)' }}>
-            {!userState.isAuthorized ? 'Autorisierung wird überprüft...' : 'Profile werden geladen...'}
+      // <div className="main-container" style={{ 
+      //   display: 'flex', 
+      //   alignItems: 'center', 
+      //   justifyContent: 'center',
+      //   minHeight: 'calc(100vh - 40px)'
+      // }}>
+      <div className="main-container flex items-center justify-center min-h-[calc(100vh-80px)] p-6">
+        <div className="text-center">
+          <div className="relative w-16 h-16 mx-auto mb-6">
+            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 opacity-20 animate-pulse" />
+            <div className="absolute inset-2 rounded-full border-4 border-transparent border-t-blue-500 animate-spin" />
+          </div>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            {!userState.isAuthorized ? "Autorisierung wird überprüft..." : "Profile werden geladen..."}
           </p>
           {error && (
-            <div style={{
-              marginTop: '20px',
-              padding: '12px 16px',
-              background: 'var(--danger-bg)',
-              border: '1px solid var(--danger-border)',
-              borderRadius: '8px',
-              color: 'var(--danger-text)',
-              fontSize: '14px',
-              maxWidth: '500px',
-              margin: '20px auto 0'
-            }}>
-              {error}
-              <button
-                onClick={() => window.location.reload()}
-                style={{
-                  marginTop: '10px',
-                  padding: '8px 16px',
-                  background: 'var(--danger-text)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '13px'
-                }}
-              >
-                Seite neu laden
-              </button>
+            <div className="mt-6 p-4 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border border-red-200 dark:border-red-800 rounded-lg max-w-md mx-auto">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 text-left">
+                  <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="mt-3 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Seite neu laden
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -556,390 +546,261 @@ export default function AdminProfilesPage() {
   }
 
   return (
-    <div className="main-container">
-      <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
-        <div style={{ marginBottom: '24px' }}>
-          <h1 style={{ fontSize: '28px', fontWeight: '600', marginBottom: '8px', color: 'var(--text-primary)' }}>
-            Benutzerprofile-Verwaltung
-          </h1>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>
-              Benutzerprofile verwalten und Rollen zuweisen
-            </p>
-            <button
-              onClick={handleRefresh}
-              disabled={isLoading || isRefreshing || !userState.isAuthorized}
-              style={{
-                padding: '8px 16px',
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                background: 'var(--input-bg)',
-                color: 'var(--text-primary)',
-                cursor: (isLoading || isRefreshing || !userState.isAuthorized) ? 'not-allowed' : 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '14px',
-                fontWeight: '500',
-                transition: 'all 0.2s',
-                opacity: (isLoading || isRefreshing || !userState.isAuthorized) ? 0.6 : 1
-              }}
-              title="Profile aktualisieren"
-            >
-              <RefreshCw 
-                style={{ 
-                  width: '16px', 
-                  height: '16px',
-                  animation: isRefreshing ? 'spin 1s linear infinite' : 'none'
-                }} 
-              />
-              {isRefreshing ? 'Wird aktualisiert...' : 'Aktualisieren'}
-            </button>
+    // <div className="main-container">
+    <div className="main-container h-full p-6 max-w-7xl mx-auto">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
+          Benutzerprofile-Verwaltung
+        </h1>
+        <div className="flex justify-between items-center">
+          <p className="text-[var(--text-secondary)] text-sm">Benutzerprofile verwalten und Rollen zuweisen</p>
+          <button
+            onClick={handleRefresh}
+            disabled={isLoading || isRefreshing || !userState.isAuthorized}
+            className="px-4 py-2 rounded-xl bg-[var(--main-bg)] backdrop-blur-lg border border-[var(--border-color)] hover:shadow-lg hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 transition-all duration-200 flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+            {isRefreshing ? "Wird aktualisiert..." : "Aktualisieren"}
+          </button>
+        </div>
+      </div>
+
+      <div className="mb-6 relative">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-[var(--text-muted)]" />
+        <input
+          type="text"
+          placeholder="Nach Name oder E-Mail suchen..."
+          value={appState.searchQuery}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          className="w-full pl-12 pr-4 py-3 rounded-xl bg-[var(--input-bg)] backdrop-blur-sm border border-[var(--border-color)] focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all duration-200 text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+        />
+      </div>
+
+      {error && (
+        <div className="mb-6 p-4 bg-[var(--danger-bg)] backdrop-blur-sm border border-[var(--danger-border)] rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-[var(--danger-text)] flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-[var(--danger-text)] flex-1">{error}</p>
           </div>
         </div>
+      )}
 
-        {/* Search */}
-        <div style={{ marginBottom: '24px', position: 'relative' }}>
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Nach Name oder E-Mail suchen..."
-            value={appState.searchQuery}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '10px 12px 10px 40px',
-              border: '1px solid var(--border-color)',
-              borderRadius: '8px',
-              background: 'var(--input-bg)',
-              color: 'var(--text-primary)',
-              fontSize: '14px'
-            }}
-          />
+      {success && (
+        <div className="mb-6 p-4 bg-[var(--success-bg)] backdrop-blur-sm border border-[var(--success-border)] rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="h-5 w-5 text-[var(--success-text)] flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-[var(--success-text)] flex-1">{success}</p>
+          </div>
         </div>
+      )}
 
-        {/* Messages */}
-        {error && (
-          <div style={{
-            padding: '12px 16px',
-            marginBottom: '16px',
-            background: 'var(--danger-bg)',
-            border: '1px solid var(--danger-border)',
-            borderRadius: '8px',
-            color: 'var(--danger-text)',
-            fontSize: '14px'
-          }}>
-            {error}
+      {modalState.deletingUserId && (
+        <div className="mb-6 p-4 bg-[var(--info-bg)] backdrop-blur-sm border border-[var(--info-border)] rounded-xl">
+          <div className="flex items-center gap-3">
+            <div className="relative w-5 h-5">
+              <div className="absolute inset-0 rounded-full border-2 border-[var(--info-border)] border-t-blue-500 animate-spin" />
+            </div>
+            <p className="text-sm text-[var(--info-text)]">Benutzer wird gelöscht...</p>
           </div>
-        )}
+        </div>
+      )}
 
-        {success && (
-          <div style={{
-            padding: '12px 16px',
-            marginBottom: '16px',
-            background: 'var(--success-bg)',
-            border: '1px solid var(--success-border)',
-            borderRadius: '8px',
-            color: 'var(--success-text)',
-            fontSize: '14px'
-          }}>
-            {success}
-          </div>
-        )}
-
-        {modalState.deletingUserId && (
-          <div style={{
-            padding: '12px 16px',
-            marginBottom: '16px',
-            background: 'var(--section-bg)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '8px',
-            color: 'var(--text-secondary)',
-            fontSize: '14px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px'
-          }}>
-            <div className="loading" style={{ width: '18px', height: '18px', borderWidth: '3px' }}></div>
-            Deleting user account...
-          </div>
-        )}
-
-        {/* Table */}
-        <div style={{
-          background: 'var(--card)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '12px',
-          overflow: 'hidden'
-        }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ background: 'var(--section-bg)', borderBottom: '2px solid var(--border-color)' }}>
-                  <th
-                    style={{
-                      padding: '16px',
-                      textAlign: 'left',
-                      fontWeight: '600',
-                      fontSize: '13px',
-                      color: 'var(--text-primary)',
-                      cursor: 'pointer',
-                      userSelect: 'none'
-                    }}
-                    onClick={() => handleSort('first_name')}
+      <div className="bg-[var(--main-bg)] backdrop-blur-lg rounded-2xl shadow-xl border border-[var(--border-color)] overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-gradient-to-r from-gray-50/80 to-gray-100/80 dark:from-gray-800/80 dark:to-gray-900/80 border-b border-[var(--border-color)]">
+                <th className="px-6 py-4 text-left">
+                  <button
+                    onClick={() => handleSort("first_name")}
+                    className="flex items-center gap-2 font-semibold text-sm text-[var(--text-primary)] hover:text-blue-600 transition-colors"
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      Vorname
-                      {appState.sortField === 'first_name' && (
-                        appState.sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
-                      )}
-                    </div>
-                  </th>
-                  <th
-                    style={{
-                      padding: '16px',
-                      textAlign: 'left',
-                      fontWeight: '600',
-                      fontSize: '13px',
-                      color: 'var(--text-primary)',
-                      cursor: 'pointer',
-                      userSelect: 'none'
-                    }}
-                    onClick={() => handleSort('last_name')}
+                    Vorname
+                    {appState.sortField === "first_name" &&
+                      (appState.sortDirection === "asc" ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      ))}
+                  </button>
+                </th>
+                <th className="px-6 py-4 text-left">
+                  <button
+                    onClick={() => handleSort("last_name")}
+                    className="flex items-center gap-2 font-semibold text-sm text-[var(--text-primary)] hover:text-blue-600 transition-colors"
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      Nachname
-                      {appState.sortField === 'last_name' && (
-                        appState.sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
-                      )}
-                    </div>
-                  </th>
-                  <th
-                    style={{
-                      padding: '16px',
-                      textAlign: 'left',
-                      fontWeight: '600',
-                      fontSize: '13px',
-                      color: 'var(--text-primary)',
-                      cursor: 'pointer',
-                      userSelect: 'none'
-                    }}
-                    onClick={() => handleSort('email')}
+                    Nachname
+                    {appState.sortField === "last_name" &&
+                      (appState.sortDirection === "asc" ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      ))}
+                  </button>
+                </th>
+                <th className="px-6 py-4 text-left">
+                  <button
+                    onClick={() => handleSort("email")}
+                    className="flex items-center gap-2 font-semibold text-sm text-[var(--text-primary)] hover:text-blue-600 transition-colors"
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      Email
-                      {appState.sortField === 'email' && (
-                        appState.sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
-                      )}
+                    E-Mail
+                    {appState.sortField === "email" &&
+                      (appState.sortDirection === "asc" ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      ))}
+                  </button>
+                </th>
+                <th className="px-6 py-4 text-left">
+                  <span className="font-semibold text-sm text-[var(--text-primary)]">Rolle</span>
+                </th>
+                <th className="px-6 py-4 text-left">
+                  <button
+                    onClick={() => handleSort("created_at")}
+                    className="flex items-center gap-2 font-semibold text-sm text-[var(--text-primary)] hover:text-blue-600 transition-colors"
+                  >
+                    Erstellt am
+                    {appState.sortField === "created_at" &&
+                      (appState.sortDirection === "asc" ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      ))}
+                  </button>
+                </th>
+                <th className="px-6 py-4 text-center">
+                  <span className="font-semibold text-sm text-[var(--text-primary)]">Aktionen</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--border-color)]">
+              {pagination.paginatedProfiles.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 flex items-center justify-center">
+                        <Search className="h-8 w-8 text-[var(--text-muted)]" />
+                      </div>
+                      <p className="text-[var(--text-secondary)] text-sm">
+                        {appState.searchQuery ? "Keine Profile gefunden" : "Keine Profile vorhanden"}
+                      </p>
                     </div>
-                  </th>
-                  <th style={{ padding: '16px', textAlign: 'left', fontWeight: '600', fontSize: '13px', color: 'var(--text-primary)' }}>
-                    Metabase Dashboard-ID
-                  </th>
-                  <th style={{ padding: '16px', textAlign: 'left', fontWeight: '600', fontSize: '13px', color: 'var(--text-primary)' }}>
-                    Rolle
-                  </th>
-                  <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', fontSize: '13px', color: 'var(--text-primary)' }}>
-                    Aktionen
-                  </th>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {pagination.paginatedProfiles.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                      {appState.searchQuery ? 'Keine Profile gefunden, die Ihrer Suche entsprechen' : 'Keine Profile gefunden'}
+              ) : (
+                pagination.paginatedProfiles.map((profile) => (
+                  <tr
+                    key={profile.id}
+                    className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors duration-150"
+                  >
+                    <td className="px-6 py-4 text-sm text-[var(--text-primary)]">{profile.first_name || "-"}</td>
+                    <td className="px-6 py-4 text-sm text-[var(--text-primary)]">{profile.last_name || "-"}</td>
+                    <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">{profile.email || "-"}</td>
+                    <td className="px-6 py-4">
+                      {profile.role === "super_admin" ? (
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm">
+                          Super Admin
+                        </span>
+                      ) : profile.role === "admin" ? (
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-sm">
+                          Admin
+                        </span>
+                      ) : profile.role === "sales_support" ? (
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-green-500 to-lime-500 text-white shadow-sm">
+                          Sales Support
+                        </span>
+                      ) : profile.role === "sales" ? (
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-green-500 to-cyan-500 text-white shadow-sm">
+                          Sales
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-[var(--text-secondary)] border border-[var(--border-color)]">
+                          Staff Member
+                        </span>
+                      )}
                     </td>
-                  </tr>
-                ) : (
-                  pagination.paginatedProfiles.map((profile) => (
-                    <tr
-                      key={profile.id}
-                      style={{
-                        borderBottom: '1px solid var(--border-color)',
-                        transition: 'background 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'var(--section-bg)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'transparent';
-                      }}
-                    >
-                      <td style={{ padding: '16px', color: 'var(--text-primary)' }}>
-                        {profile.first_name || '-'}
-                      </td>
-                      <td style={{ padding: '16px', color: 'var(--text-primary)' }}>
-                        {profile.last_name || '-'}
-                      </td>
-                      <td style={{ padding: '16px', color: 'var(--text-primary)' }}>
-                        {profile.email || '-'}
-                      </td>
-                      <td style={{ padding: '16px', color: 'var(--text-primary)' }}>
-                        {profile.metabase_dashboard_id || '-'}
-                      </td>
-                      <td style={{ padding: '16px', color: 'var(--text-primary)' }}>
-                        {profile.role ? (
-                          <span style={{
-                            padding: '4px 8px',
-                            borderRadius: '4px',
-                            background: 'var(--section-bg)',
-                            fontSize: '13px',
-                            textTransform: 'capitalize'
-                          }}>
-                            {profile.role.replace('_', ' ')}
-                          </span>
-                        ) : (
-                          <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Staff Member</span>
-                        )}
-                      </td>
-                      <td style={{ padding: '16px', textAlign: 'right', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                        {canEditProfile(profile) ? (
-                          <button
-                            onClick={() => handleEdit(profile)}
-                            disabled={isSaving || modalState.deletingUserId === profile.id}
-                            style={{
-                              padding: '8px 12px',
-                              background: 'transparent',
-                              border: '1px solid var(--border-color)',
-                              borderRadius: '6px',
-                              color: 'var(--text-primary)',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              fontSize: '13px',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = 'var(--section-bg)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = 'transparent';
-                            }}
-                          >
-                            <Edit2 className="h-4 w-4" />
-                            Bearbeiten
-                          </button>
-                        ) : (
-                          <span style={{
-                            padding: '8px 12px',
-                            color: 'var(--text-secondary)',
-                            fontSize: '13px',
-                            fontStyle: 'italic'
-                          }}>
-                            Eingeschränkt
-                          </span>
-                        )}
-
-                        {userState.isSuperAdmin && (
+                    <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
+                      {new Date(profile.created_at).toLocaleDateString("de-DE")}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-start gap-2">
+                        <button
+                          onClick={() => handleEdit(profile)}
+                          disabled={!canEditProfile(profile)}
+                          className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 hover:scale-105"
+                          title="Profil bearbeiten"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                        {userState.isSuperAdmin && profile.id !== userState.userId && (
                           <button
                             onClick={() => openDeleteModal(profile)}
-                            disabled={modalState.deletingUserId === profile.id || isSaving}
-                            style={{
-                              padding: '8px 12px',
-                              background: 'transparent',
-                              border: '1px solid var(--danger-border)',
-                              borderRadius: '6px',
-                              color: 'var(--danger-text)',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              fontSize: '13px',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = 'var(--danger-bg)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = 'transparent';
-                            }}
+                            className="p-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all duration-200 hover:scale-105"
+                            title="Benutzer löschen"
                           >
-                            {modalState.deletingUserId === profile.id ? (
-                              <>
-                                <div className="loading" style={{ width: '14px', height: '14px', borderWidth: '2px' }}></div>
-                                Wird gelöscht...
-                              </>
-                            ) : (
-                              'Löschen'
-                            )}
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                              />
+                            </svg>
                           </button>
                         )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
 
-          {/* Pagination */}
-          {pagination.totalPages > 1 && (
-            <div style={{
-              padding: '16px',
-              borderTop: '1px solid var(--border-color)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-                Zeige {pagination.startIndex + 1} bis {Math.min(pagination.endIndex, filteredAndSortedProfiles.length)} von {filteredAndSortedProfiles.length} Profilen
-              </div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        {pagination.totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-[var(--border-color)] bg-gray-50/50 dark:bg-gray-800/50">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-[var(--text-secondary)]">
+                Zeige {pagination.startIndex + 1} bis {Math.min(pagination.endIndex, filteredAndSortedProfiles.length)}{" "}
+                von {filteredAndSortedProfiles.length} Profilen
+              </p>
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={() => handlePageChange(Math.max(1, appState.currentPage - 1))}
+                  onClick={() => handlePageChange(appState.currentPage - 1)}
                   disabled={appState.currentPage === 1}
-                  style={{
-                    padding: '8px 12px',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '6px',
-                    background: appState.currentPage === 1 ? 'var(--section-bg)' : 'var(--input-bg)',
-                    color: 'var(--text-primary)',
-                    cursor: appState.currentPage === 1 ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    fontSize: '13px'
-                  }}
+                  className="p-2 rounded-lg bg-white dark:bg-gray-800 border border-[var(--border-color)] hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                 >
                   <ChevronLeft className="h-4 w-4" />
-                  Zurück
                 </button>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '14px', padding: '0 8px' }}>
+                <span className="px-4 py-2 text-sm font-medium text-[var(--text-primary)]">
                   Seite {appState.currentPage} von {pagination.totalPages}
                 </span>
                 <button
-                  onClick={() => handlePageChange(Math.min(pagination.totalPages, appState.currentPage + 1))}
+                  onClick={() => handlePageChange(appState.currentPage + 1)}
                   disabled={appState.currentPage === pagination.totalPages}
-                  style={{
-                    padding: '8px 12px',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '6px',
-                    background: appState.currentPage === pagination.totalPages ? 'var(--section-bg)' : 'var(--input-bg)',
-                    color: 'var(--text-primary)',
-                    cursor: appState.currentPage === pagination.totalPages ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    fontSize: '13px'
-                  }}
+                  className="p-2 rounded-lg bg-white dark:bg-gray-800 border border-[var(--border-color)] hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                 >
-                  Weiter
                   <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* Edit Modal */}
+      {/* Modals */}
       {modalState.editingProfile && (
         <EditProfileModal
           profile={modalState.editingProfile}
           isOpen={true}
-          onClose={() => setModalState(prev => ({ ...prev, editingProfile: null }))}
+          onClose={() => setModalState((prev) => ({ ...prev, editingProfile: null }))}
           onSave={handleSaveProfile}
           isSaving={isSaving}
           currentUserIsSuperAdmin={userState.isSuperAdmin}
@@ -947,7 +808,6 @@ export default function AdminProfilesPage() {
         />
       )}
 
-      {/* Delete Confirmation Modal */}
       <DeleteConfirmationModal
         isOpen={modalState.isDeleteModalOpen}
         onClose={closeDeleteModal}
@@ -955,11 +815,10 @@ export default function AdminProfilesPage() {
         title="Benutzerkonto löschen"
         message={
           modalState.userToDelete
-            ? `Sind Sie sicher, dass Sie ${modalState.userToDelete.email || 'diesen Benutzer'} löschen möchten? Dies entfernt das Konto und das zugehörige Profil.`
-            : 'Sind Sie sicher, dass Sie diesen Benutzer löschen möchten?'
+            ? `Sind Sie sicher, dass Sie ${modalState.userToDelete.email || "diesen Benutzer"} löschen möchten? Dies entfernt das Konto und das zugehörige Profil.`
+            : "Sind Sie sicher, dass Sie diesen Benutzer löschen möchten?"
         }
       />
-
     </div>
   );
 }

@@ -32,6 +32,12 @@
     --bg-gradient-start: #f5f7fa;
     --bg-gradient-end: #e8ecf1;
     --main-bg: rgba(255, 255, 255, 0.95);
+    /* --main-bg: linear-gradient(
+      135deg,
+      rgba(239, 246, 255, 0.95),
+      rgba(238, 242, 255, 0.95),
+      rgba(250, 245, 255, 0.95)
+    ); */
     --text-primary: #333;
     --text-secondary: #666;
     --text-muted: #999;
@@ -164,7 +170,13 @@ body.dark-mode h1 {
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+  /* background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%); */
+  background: linear-gradient(
+    135deg,
+    rgba(239, 246, 255, 0.95),
+    rgba(238, 242, 255, 0.95),
+    rgba(250, 245, 255, 0.95)
+  );
   min-height: 100vh;
   color: var(--text-primary);
   transition: all 0.3s ease;
@@ -2656,7 +2668,7 @@ body.dark-mode #simpleLanguage:focus {
 }
 
 .left-navigation.collapsed {
-  width: 70px;
+  width: 80px;
 }
 
 .left-navigation.expanded {
@@ -2679,6 +2691,23 @@ body.dark-mode #simpleLanguage:focus {
   align-items: center;
   justify-content: center;
   min-height: 50px;
+}
+
+.nav-logo-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  cursor: pointer;
+}
+
+.nav-logo-link:hover {
+  opacity: 0.8;
+  transform: scale(1.05);
+}
+
+.nav-logo-link:active {
+  transform: scale(0.98);
 }
 
 .nav-title {
@@ -2865,7 +2894,7 @@ body.dark-mode .nav-link.active {
 .main-content {
   flex: 1;
   margin-left: 250px;
-  transition: margin-left 0.3s ease;
+  transition: margin-left 0.3s ease, width 0.3s ease;
   min-height: 100vh;
   width: calc(100% - 250px);
   padding: 20px;
@@ -2875,8 +2904,8 @@ body.dark-mode .nav-link.active {
 }
 
 .left-navigation.collapsed ~ .main-content {
-  margin-left: 70px;
-  width: calc(100% - 70px);
+  margin-left: 70px !important;
+  width: calc(100% - 70px) !important;
 }
 
 /* When navigation is hidden (auth pages) */

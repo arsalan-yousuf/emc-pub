@@ -115,7 +115,7 @@ export default function EditProfileModal({
     if (currentUserIsSuperAdmin) {
       options.push(
         { value: 'admin', label: 'Admin' },
-        { value: 'super_admin', label: 'Super Admin' }
+        // { value: 'super_admin', label: 'Super Admin' }
       );
     }
 
@@ -129,9 +129,9 @@ export default function EditProfileModal({
   }, [isEditingOwnProfile, currentUserIsSuperAdmin]);
 
   const handleModalBackdropClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
+    // if (e.target === e.currentTarget) {
+    //   onClose();
+    // }
   }, [onClose]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
@@ -143,250 +143,271 @@ export default function EditProfileModal({
   if (!isOpen) return null;
 
   return (
-    <div className="settings-modal" onClick={handleModalBackdropClick}>
+    <div
+      className="settings-modal"
+      style={{
+        background: "rgba(54, 54, 54, 0.5)",
+        backdropFilter: "blur(8px)",
+        borderRadius: "16px",
+      }}
+      onClick={handleModalBackdropClick}
+    >
       <div
-        className="settings-modal-content"
+        className="relative w-full max-w-2xl"
         style={{
-          maxWidth: '600px',
-          width: '90vw',
-          height: 'auto',
-          maxHeight: '90vh',
-          margin: 'auto',
-          display: 'flex',
-          flexDirection: 'column'
+          background: "linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.1))",
+          padding: "2px",
+          borderRadius: "16px",
+          boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)",
+          animation: "fadeIn 0.3s ease-out",
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="settings-header">
-          <h3>Profil bearbeiten</h3>
-          <button
-            type="button"
-            className="close-modal"
-            onClick={onClose}
-            disabled={isSaving}
+        <div
+          style={{
+            background: "var(--main-bg)",
+            backdropFilter: "blur(20px)",
+            borderRadius: "14px",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            className="flex items-center justify-between p-6 border-b"
+            style={{ borderColor: "var(--border-color)" }}
           >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="settings-body" style={{ flex: '1 1 auto', overflowY: 'auto', padding: '24px' }}>
-          <form 
-            onSubmit={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              return false;
-            }} 
-            style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: '1' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-primary)' }}>
+            <h3
+              className="text-xl font-bold"
+              style={{
+                background: "linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
+            >
+              Profil bearbeiten
+            </h3>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSaving}
+              className="p-2 rounded-lg transition-all duration-200"
+              style={{
+                color: "var(--text-secondary)",
+                background: "transparent",
+                border: "none",
+                cursor: isSaving ? "not-allowed" : "pointer",
+              }}
+              onMouseEnter={(e) => {
+                if (!isSaving) {
+                  e.currentTarget.style.background = "var(--section-bg)"
+                  e.currentTarget.style.color = "var(--text-primary)"
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent"
+                e.currentTarget.style.color = "var(--text-secondary)"
+              }}
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="p-6 max-h-[80vh] overflow-y-auto">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
                   Vorname
                 </label>
                 <input
                   type="text"
                   value={formData.first_name}
-                  onChange={(e) => updateField('first_name', e.target.value)}
+                  onChange={(e) => updateField("first_name", e.target.value)}
                   required
                   disabled={isSaving}
+                  className="px-4 py-3 rounded-lg text-sm transition-all duration-200"
                   style={{
-                    padding: '10px 12px',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '8px',
-                    background: 'var(--input-bg)',
-                    color: 'var(--text-primary)',
-                    fontSize: '14px',
-                    width: '100%'
+                    border: "1px solid var(--border-color)",
+                    background: "var(--input-bg)",
+                    color: "var(--text-primary)",
+                    outline: "none",
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = "#3b82f6"
+                    e.currentTarget.style.boxShadow = "0 0 0 3px rgba(59, 130, 246, 0.1)"
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = "var(--border-color)"
+                    e.currentTarget.style.boxShadow = "none"
                   }}
                 />
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-primary)' }}>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
                   Nachname
                 </label>
                 <input
                   type="text"
                   value={formData.last_name}
-                  onChange={(e) => updateField('last_name', e.target.value)}
+                  onChange={(e) => updateField("last_name", e.target.value)}
                   required
                   disabled={isSaving}
+                  className="px-4 py-3 rounded-lg text-sm transition-all duration-200"
                   style={{
-                    padding: '10px 12px',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '8px',
-                    background: 'var(--input-bg)',
-                    color: 'var(--text-primary)',
-                    fontSize: '14px',
-                    width: '100%'
+                    border: "1px solid var(--border-color)",
+                    background: "var(--input-bg)",
+                    color: "var(--text-primary)",
+                    outline: "none",
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = "#3b82f6"
+                    e.currentTarget.style.boxShadow = "0 0 0 3px rgba(59, 130, 246, 0.1)"
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = "var(--border-color)"
+                    e.currentTarget.style.boxShadow = "none"
                   }}
                 />
               </div>
 
-              {/* <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-primary)' }}>
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  // onChange={(e) => updateField('email', e.target.value)}
-                  // required
-                  // disabled={isSaving}
-                  readOnly
-                  disabled
-                  style={{
-                    padding: '10px 12px',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '8px',
-                    background: 'var(--section-bg)',
-                    color: 'var(--text-secondary)',
-                    fontSize: '14px',
-                    width: '100%',
-                    cursor: 'not-allowed',
-                    opacity: 0.7
-                  }}
-                />
-                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>
-                  E-Mail-Adresse kann nicht geändert werden
-                </p>
-              </div> */}
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-primary)' }}>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
                   Metabase Dashboard-ID
                 </label>
                 <input
                   type="number"
-                  value={formData.metabase_dashboard_id?.toString() || ''}
+                  value={formData.metabase_dashboard_id?.toString() || ""}
                   onChange={(e) => handleMetabaseIdChange(e.target.value)}
                   disabled={isSaving}
                   placeholder="Optional"
+                  className="px-4 py-3 rounded-lg text-sm transition-all duration-200"
                   style={{
-                    padding: '10px 12px',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '8px',
-                    background: 'var(--input-bg)',
-                    color: 'var(--text-primary)',
-                    fontSize: '14px',
-                    width: '100%'
+                    border: "1px solid var(--border-color)",
+                    background: "var(--input-bg)",
+                    color: "var(--text-primary)",
+                    outline: "none",
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = "#3b82f6"
+                    e.currentTarget.style.boxShadow = "0 0 0 3px rgba(59, 130, 246, 0.1)"
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = "var(--border-color)"
+                    e.currentTarget.style.boxShadow = "none"
                   }}
                 />
-                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>
+                <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
                   Leave empty if not applicable
                 </p>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-primary)' }}>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
                   Rolle
                 </label>
                 <select
-                  key={`role-select-${profile.id}-${formData.role || 'none'}`}
-                  value={formData.role || ''}
+                  key={`role-select-${profile.id}-${formData.role || "none"}`}
+                  value={formData.role || ""}
                   onChange={(e) => handleRoleChange(e.target.value)}
                   disabled={isSaving || isEditingOwnProfile}
+                  className="px-4 py-3 rounded-lg text-sm transition-all duration-200"
                   style={{
-                    padding: '10px 12px',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '8px',
-                    background: isEditingOwnProfile ? 'var(--section-bg)' : 'var(--input-bg)',
-                    color: 'var(--text-primary)',
-                    fontSize: '14px',
-                    width: '100%',
-                    cursor: isEditingOwnProfile ? 'not-allowed' : 'pointer',
-                    opacity: isEditingOwnProfile ? 0.6 : 1
+                    border: "1px solid var(--border-color)",
+                    background: isEditingOwnProfile ? "var(--section-bg)" : "var(--input-bg)",
+                    color: "var(--text-primary)",
+                    cursor: isEditingOwnProfile ? "not-allowed" : "pointer",
+                    opacity: isEditingOwnProfile ? 0.6 : 1,
+                    outline: "none",
+                  }}
+                  onFocus={(e) => {
+                    if (!isEditingOwnProfile) {
+                      e.currentTarget.style.borderColor = "#3b82f6"
+                      e.currentTarget.style.boxShadow = "0 0 0 3px rgba(59, 130, 246, 0.1)"
+                    }
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = "var(--border-color)"
+                    e.currentTarget.style.boxShadow = "none"
                   }}
                 >
-                  {roleOptions.map(option => (
+                  {roleOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
                   ))}
                 </select>
-                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>
+                <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
                   {roleHelpText}
                 </p>
               </div>
 
-            </div>
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--border-color)' }}>
-              <button
-                type="button"
-                className="action-button"
-                onClick={onClose}
-                disabled={isSaving}
-                style={{
-                  background: 'var(--input-bg)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--border-color)',
-                  minWidth: '100px',
-                  padding: '10px 20px',
-                  borderRadius: '8px',
-                  cursor: isSaving ? 'not-allowed' : 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isSaving) {
-                    e.currentTarget.style.background = 'var(--section-bg)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'var(--input-bg)';
-                }}
+              <div
+                className="flex items-center justify-end gap-3 pt-5 mt-1"
+                style={{ borderTop: "1px solid var(--border-color)" }}
               >
-                Abbrechen
-              </button>
-              <button
-                type="button"
-                className="action-button"
-                disabled={isSaving}
-                onClick={handleSave}
-                style={{
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                  color: 'white',
-                  border: 'none',
-                  minWidth: '140px',
-                  padding: '10px 20px',
-                  borderRadius: '8px',
-                  cursor: isSaving ? 'not-allowed' : 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  transition: 'all 0.2s',
-                  opacity: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  position: 'relative',
-                  pointerEvents: isSaving ? 'none' : 'auto'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isSaving) {
-                    e.currentTarget.style.transform = 'translateY(-1px)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" style={{ flexShrink: 0 }} />
-                    <span>Wird gespeichert...</span>
-                  </>
-                ) : (
-                  <span>Änderungen speichern</span>
-                )}
-              </button>
-            </div>
-          </form>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={isSaving}
+                  className="px-6 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200"
+                  style={{
+                    background: "var(--input-bg)",
+                    color: "var(--text-primary)",
+                    border: "1px solid var(--border-color)",
+                    cursor: isSaving ? "not-allowed" : "pointer",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSaving) {
+                      e.currentTarget.style.background = "var(--section-bg)"
+                      e.currentTarget.style.transform = "translateY(-1px)"
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "var(--input-bg)"
+                    e.currentTarget.style.transform = "translateY(0)"
+                  }}
+                >
+                  Abbrechen
+                </button>
+                <button
+                  type="button"
+                  disabled={isSaving}
+                  onClick={handleSave}
+                  className="px-6 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center gap-2"
+                  style={{
+                    background: "linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)",
+                    color: "white",
+                    border: "none",
+                    cursor: isSaving ? "not-allowed" : "pointer",
+                    position: "relative",
+                    overflow: "hidden",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSaving) {
+                      e.currentTarget.style.transform = "translateY(-1px)"
+                      e.currentTarget.style.boxShadow = "0 4px 12px rgba(59, 130, 246, 0.4)"
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "translateY(0)"
+                    e.currentTarget.style.boxShadow = "none"
+                  }}
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Wird gespeichert...</span>
+                    </>
+                  ) : (
+                    <span>Änderungen speichern</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
     </div>
-  );
+  )
 }
 

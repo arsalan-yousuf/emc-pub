@@ -6,9 +6,11 @@ import React, {
   useEffect,
   useState,
   useCallback,
+  useMemo,
+  useRef,
 } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { getUserRoles, getUserRole, type UserRole } from '@/lib/user-roles';
+import { getUserRoles, type UserRole } from '@/lib/user-roles';
 import { fetchCurrentProfile } from '@/lib/profiles-server';
 
 /* ============================================================================
@@ -30,7 +32,7 @@ interface UserContextType {
   roles: UserRole[];
   isAdmin: boolean;
   isSuperAdmin: boolean;
-  isLoading: boolean; // AUTH loading only (fast)
+  isLoading: boolean; // AUTH readiness only
   refreshUserData: () => Promise<void>;
 }
 
@@ -54,8 +56,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
-  // IMPORTANT: this only tracks AUTH readiness
+  // Tracks only auth readiness (fast)
   const [isLoading, setIsLoading] = useState(true);
+
+  // 🔒 Prevents auth noise (tab focus, token refresh)
+  const lastUserIdRef = useRef<string | null>(null);
 
   /* ============================================================================
    * Helpers
@@ -80,7 +85,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   );
 
   /* ============================================================================
-   * Fetch profile + roles (NON-BLOCKING)
+   * Fetch profile + roles (non-blocking)
    * ==========================================================================*/
 
   const fetchUserDetails = useCallback(
@@ -88,7 +93,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       try {
         const [profileResult, fetchedRoles] = await Promise.all([
           fetchCurrentProfile(),
-          getUserRoles(), // no long timeout
+          getUserRoles(),
         ]);
 
         const profileData = profileResult.success
@@ -110,14 +115,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
         setIsSuperAdmin(isSuper);
         setIsAdmin(isAdm);
-
-        // Primary role
-        if (fetchedRoles.length > 0) {
-          setRole(fetchedRoles[0]);
-        } else {
-          const fallbackRole = await getUserRole(authUser.id);
-          setRole(fallbackRole);
-        }
+        setRole(fetchedRoles[0] ?? null);
       } catch (err) {
         console.error('Failed to fetch user details:', err);
       }
@@ -126,7 +124,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   );
 
   /* ============================================================================
-   * Refresh (manual trigger)
+   * Manual refresh
    * ==========================================================================*/
 
   const refreshUserData = useCallback(async () => {
@@ -136,12 +134,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
     if (!authUser) return;
 
-    setUser(authUser);
-    fetchUserDetails(authUser);
+    setUser(prev => (prev?.id === authUser.id ? prev : authUser));
+    await fetchUserDetails(authUser);
   }, [fetchUserDetails, supabase]);
 
   /* ============================================================================
-   * Auth bootstrap (FAST)
+   * Auth bootstrap + listener
    * ==========================================================================*/
 
   useEffect(() => {
@@ -155,10 +153,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (!isActive) return;
 
       if (authUser) {
+        lastUserIdRef.current = authUser.id;
         setUser(authUser);
-        setIsLoading(false); // ✅ auth ready immediately
+        setIsLoading(false); // auth ready immediately
         fetchUserDetails(authUser); // background
       } else {
+        lastUserIdRef.current = null;
         setUser(null);
         setIsLoading(false);
       }
@@ -168,12 +168,22 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!isActive) return;
 
-      if (session?.user) {
-        setUser(session.user);
-        fetchUserDetails(session.user);
+      const newUser = session?.user ?? null;
+      const newUserId = newUser?.id ?? null;
+
+      // 🔒 Ignore auth noise (tab focus, token refresh)
+      if (newUserId === lastUserIdRef.current) {
+        return;
+      }
+
+      lastUserIdRef.current = newUserId;
+
+      if (newUser) {
+        setUser(newUser);
+        fetchUserDetails(newUser);
       } else {
         setUser(null);
         setProfile(null);
@@ -191,19 +201,22 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, [fetchUserDetails, supabase]);
 
   /* ============================================================================
-   * Context value
+   * Memoized context value (prevents mass re-renders)
    * ==========================================================================*/
 
-  const value: UserContextType = {
-    user,
-    profile,
-    role,
-    roles,
-    isAdmin,
-    isSuperAdmin,
-    isLoading,
-    refreshUserData,
-  };
+  const value = useMemo<UserContextType>(
+    () => ({
+      user,
+      profile,
+      role,
+      roles,
+      isAdmin,
+      isSuperAdmin,
+      isLoading,
+      refreshUserData,
+    }),
+    [user, profile, role, roles, isAdmin, isSuperAdmin, isLoading, refreshUserData]
+  );
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }

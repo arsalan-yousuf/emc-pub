@@ -4,7 +4,7 @@ export function AuthIllustration() {
   return (
     <div className="relative h-full w-full overflow-hidden bg-gradient-to-br from-[#1e40af] via-[#2563eb] to-[#3b82f6]">
       <Image
-        src="/Dashboard2.jpg"
+        src="/AuthImage.png"
         alt="EMC Sales Dashboard"
         fill
         className="object-cover"
