@@ -22,13 +22,14 @@ export default function AnalyticsPage() {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Set a timeout to detect if service is unavailable (30 seconds)
+  // Set a timeout to detect if service is unavailable (10 seconds)
+  // This catches network timeouts before the browser shows its error page
   useEffect(() => {
     if (isLoading && !hasError) {
       timeoutRef.current = setTimeout(() => {
         setIsLoading(false);
         setHasError(true);
-      }, 30000); // 30 seconds timeout
+      }, 10000); // 10 seconds timeout - catches network errors faster
     }
 
     return () => {
@@ -45,6 +46,36 @@ export default function AnalyticsPage() {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
+    
+    // Additional check: verify iframe actually loaded content
+    // If the iframe loaded but we can't access it, it might be a browser error page
+    try {
+      const iframe = iframeRef.current;
+      if (iframe) {
+        // Try to access iframe content (may fail due to CORS, but that's okay)
+        // If it's a browser error page, the iframe might be accessible but empty
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        
+        // If we can access the document, check if it looks like an error page
+        if (iframeDoc) {
+          const bodyText = iframeDoc.body?.innerText?.toLowerCase() || '';
+          const isErrorPage = bodyText.includes('took too long') || 
+                             bodyText.includes('unable to connect') ||
+                             bodyText.includes('this site can\'t be reached') ||
+                             bodyText.includes('err_');
+          
+          if (isErrorPage) {
+            setIsLoading(false);
+            setHasError(true);
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      // CORS error - can't access iframe content, assume it loaded successfully
+      // This is expected for cross-origin iframes
+    }
+    
     setIsLoading(false);
     setHasError(false);
   };
@@ -87,7 +118,7 @@ export default function AnalyticsPage() {
             <CardContent className="flex flex-col items-center gap-4">
               <div className="loading" style={{ width: '40px', height: '40px', borderWidth: '4px' }}></div>
               <p className="text-sm text-muted-foreground text-center">
-                Dies kann einen Moment dauern, wenn Sie nicht im Büronetzwerk sind.
+                Dies funktioniert nur, wenn Sie im Büro sind.
               </p>
             </CardContent>
           </Card>
@@ -101,16 +132,17 @@ export default function AnalyticsPage() {
               <div className="flex items-center justify-center mb-2">
                 <AlertCircle className="h-12 w-12 text-destructive" />
               </div>
-              <CardTitle className="text-center">Service nicht verfügbar</CardTitle>
-              <CardDescription className="text-center">
-                Verbindung zum Analytics-Dashboard konnte nicht hergestellt werden
-              </CardDescription>
+              <CardTitle className="text-center">Analytics ist derzeit nicht verfügbar</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col items-center gap-4">
-              <p className="text-sm text-muted-foreground text-center">
-                Das Analytics-Tool ist möglicherweise nicht verfügbar oder Sie sind nicht mit dem Büronetzwerk verbunden.
-                Bitte überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.
-              </p>
+              <div className="text-sm text-muted-foreground text-center space-y-2">
+                <p>
+                  Diese Funktion funktioniert nur, wenn Sie mit dem Büronetzwerk verbunden sind.
+                </p>
+                <p>
+                  Bitte versuchen Sie es erneut, wenn Sie wieder im Büro sind
+                </p>
+              </div>
               <Button 
                 onClick={handleRetry} 
                 disabled={isRetrying}
@@ -124,7 +156,7 @@ export default function AnalyticsPage() {
                 ) : (
                   <>
                     <RefreshCw className="mr-2 h-4 w-4" />
-                    Verbindung erneut versuchen
+                    Erneut versuchen
                   </>
                 )}
               </Button>
