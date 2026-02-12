@@ -1,6 +1,7 @@
 # Build and deploy Next.js app to Azure App Service
 # Ref: https://learn.microsoft.com/en-us/azure/app-service/deploy-github-actions?tabs=openid%2Cnodejs
-# Set GitHub secret: AZURE_WEBAPP_PUBLISH_PROFILE (download from Web App → Get publish profile)
+# Set GitHub secret: AZURE_WEBAPP_PUBLISH_PROFILE (download from Web App → Get publish profile).
+# Enable Basic authentication on the Web App (Configuration → General settings) to download the profile.
 # Optional: AZURE_WEBAPP_NAME (defaults to emc-sales-cockpit)
 
 name: Build and deploy to Azure Web App
@@ -12,7 +13,7 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_WEBAPP_NAME: emc-sales-cockpit   # or set via GitHub secret
+  AZURE_WEBAPP_NAME: emc-sales-cockpit
 
 jobs:
   build-and-deploy:
@@ -33,7 +34,6 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          # NEXT_PUBLIC_* are baked in at build time. Add these as repo secrets for production.
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || '' }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '' }}
           NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL || '' }}

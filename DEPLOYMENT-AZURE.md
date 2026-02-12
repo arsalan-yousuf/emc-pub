@@ -139,17 +139,11 @@ az webapp up --resource-group rg-emc-sales-cockpit --name emc-sales-cockpit --ru
 
 A workflow is provided to build the Next.js app and deploy to Azure App Service. It follows the [official Microsoft guidance](https://learn.microsoft.com/en-us/azure/app-service/deploy-github-actions?tabs=openid%2Cnodejs#add-the-workflow-file-to-your-github-repository): for Node.js/TypeScript apps, build in GitHub Actions and deploy the built artifact (set **SCM_DO_BUILD_DURING_DEPLOYMENT** = `false` on the Web App so Azure does not rebuild).
 
-### 5.1 Azure credentials (Service Principal)
+### 5.1 Publish profile (Basic authentication)
 
-1. **Azure Portal** → **Azure Active Directory** → **App registrations** → **New registration**
-   - Name: `emc-sales-cockpit-github`
-   - **Register**
-2. **Certificates & secrets** → **New client secret** → save the **Value** (secret).
-3. **Overview** → copy **Application (client) ID** and **Directory (tenant) ID**.
-4. In **Subscriptions** → your subscription → **Access control (IAM)** → **Add role assignment**:
-   - Role: **Website Contributor** (or **Contributor**) scoped to the resource group or Web App
-   - Assign access to: **User, group, or service principal** → select `emc-sales-cockpit-github`
-5. Get **Subscription ID**: Subscriptions → your subscription → **Subscription ID**.
+1. In the **Web App** → **Configuration** → **General settings**, set **Basic authentication** to **On** (required to download the publish profile). Save.
+2. In the Web App **Overview**, click **Get publish profile** and download the `.PublishSettings` file.
+3. Open the file in a text editor and copy its **entire contents** (XML) for use as a GitHub secret (see 5.2).
 
 ### 5.2 GitHub secrets
 
@@ -157,23 +151,21 @@ In the repo: **Settings** → **Secrets and variables** → **Actions** → **Ne
 
 | Secret name | Value | Required |
 |------------|--------|----------|
-| `AZURE_WEBAPP_PUBLISH_PROFILE` | Web App **publish profile** (download from Web App → **Get publish profile**) | Yes |
+| `AZURE_WEBAPP_PUBLISH_PROFILE` | **Entire contents** of the publish profile file (from **Get publish profile**) | Yes |
 | `AZURE_WEBAPP_NAME` | Your Web App name (e.g. `emc-sales-cockpit`) | Optional; workflow has a default |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | Yes for production build |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase anon key | Yes for production build |
 | `NEXT_PUBLIC_SITE_URL` | Production URL (e.g. `https://emc-sales-cockpit.azurewebsites.net`) | Yes for production build |
 
-Using **publish profile** is the quickest for deploy: in the Web App blade, click **Get publish profile**, then paste the entire file contents into the `AZURE_WEBAPP_PUBLISH_PROFILE` secret.  
-`NEXT_PUBLIC_*` secrets are used at **build time** so the correct values are embedded in the client bundle; also set them in Azure Application settings for consistency.
+`NEXT_PUBLIC_*` secrets are used at **build time**; also set them in the Web App **Configuration** → **Application settings** for consistency.
 
 ### 5.3 Workflow file
 
 The workflow file is in `.github/workflows/azure-deploy.yml`. It:
 
-- Triggers on push to `main` (or the branch you use for production)
-- Uses Node 22
-- Runs `npm ci` and `npm run build`
-- Deploys to Azure App Service using the publish profile
+- Triggers on push to `main` (or **workflow_dispatch** for manual runs)
+- Uses Node 22, runs `npm ci` and `npm run build`
+- Deploys to Azure App Service using the **publish profile** (`azure/webapps-deploy@v3`)
 
 Adjust the `branches` and `AZURE_WEBAPP_NAME` (or secret) as needed.
 
@@ -206,6 +198,7 @@ Ensure all required app settings (see section 3.1) are set in the Web App **Conf
 | Auth redirect wrong | `NEXT_PUBLIC_SITE_URL` must be exactly the app URL (e.g. `https://emc-sales-cockpit.azurewebsites.net`). Supabase redirect URLs must include this. |
 | Build fails in Azure | Use GitHub Actions to build and deploy the built artifact; or set **Startup Command** to `npm run build && npm run start` and deploy source. |
 | Env vars not applied | After changing Application settings, **Save** and **Restart** the Web App. |
+| "No credentials found" / deploy fails | Enable **Basic authentication** on the Web App (Configuration → General settings), then download the publish profile and set the `AZURE_WEBAPP_PUBLISH_PROFILE` secret to its full contents. |
 
 ---
 
