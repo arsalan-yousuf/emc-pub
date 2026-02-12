@@ -5,13 +5,7 @@ import NavigationWrapper from "@/components/NavigationWrapper";
 import { UserProvider } from "@/contexts/UserContext";
 import "./globals.css";
 
-const defaultUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ||
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
-  (typeof process.env.WEBSITE_HOSTNAME !== "undefined"
-    ? `https://${process.env.WEBSITE_HOSTNAME}`
-    : null) ||
-  "http://localhost:3000";
+const defaultUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
