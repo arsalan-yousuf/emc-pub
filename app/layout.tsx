@@ -5,10 +5,23 @@ import NavigationWrapper from "@/components/NavigationWrapper";
 import { UserProvider } from "@/contexts/UserContext";
 import "./globals.css";
 
-const defaultUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+function getMetadataBase(): URL {
+  const raw =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+    (typeof process.env.WEBSITE_HOSTNAME !== "undefined"
+      ? `https://${process.env.WEBSITE_HOSTNAME}`
+      : null) ||
+    "http://localhost:3000";
+  try {
+    return new URL(raw);
+  } catch {
+    return new URL("http://localhost:3000");
+  }
+}
 
 export const metadata: Metadata = {
-  metadataBase: new URL(defaultUrl),
+  metadataBase: getMetadataBase(),
   title: "EMC Sales Cockpit",
   description: "EMC Sales Cockpit",
 };
