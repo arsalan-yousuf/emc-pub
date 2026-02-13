@@ -39,5 +39,4 @@ jobs:
         with:
           app-name: 'emc-sales-cockpit-de'
           slot-name: 'Production'
-          package: .
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_CB45881AC266476C9E6ED0155FBDAB15 }}
